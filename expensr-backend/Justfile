@@ -1,0 +1,11 @@
+# Levantar el backend en modo desarrollo
+dev:
+    uv run uvicorn app.main:app --reload --port 8000
+
+# Revisar la calidad de código con el linter
+lint:
+    uv run ruff check .
+
+# Formatear el código automáticamente
+format:
+    uv run ruff format .
