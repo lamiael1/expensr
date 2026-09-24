@@ -8,6 +8,7 @@ dependencies = [
     "python-dotenv>=1.2.3",
     "python-multipart>=0.0.32",
     "ruff>=0.16.8",
+    "sqlalchemy>=2.0.54",
     "uvicorn>=0.53.0",
 ]
 [tool.pyright]

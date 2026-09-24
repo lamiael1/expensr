@@ -1,13 +1,22 @@
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
-# Modelo para recibir datos al crear un gasto
 class ExpenseCreate(BaseModel):
-    fecha: str
+    concepto: str
     categoria: str
     importe: float
 
 
-# Modelo para devolver datos al consultar (incluye ID)
-class ExpenseResponse(ExpenseCreate):
+class ExpenseResponse(BaseModel):
     id: int
+    concepto: str
+    categoria: str
+    importe: float
+    estado: str
+    fecha_creacion: datetime
+    fecha_validacion_baw: datetime | None = None
+    fecha_decision_appian: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
