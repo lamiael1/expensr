@@ -1,39 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import expenses
+from app.routers import chat, expenses, monitor
 
 app = FastAPI(
     title="Expensr API",
-    description="Backend para la gestión de notas de gastos",
+    description="API de backend para la gestión de gastos empresarial",
     version="0.1.0",
 )
 
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
+# Configuración de CORS para conectar con el frontend en React
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # En producción se especifica el dominio del frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Conectar los routers de la aplicación
+# Registrar los routers
 app.include_router(expenses.router)
+app.include_router(chat.router)
+app.include_router(monitor.router)
 
 
 @app.get("/")
 def read_root():
-    return {
-        "status": "ok",
-        "message": "¡Backend de Expensr funcionando correctamente en WSL!",
-    }
-
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"}
+    return {"message": "Bienvenido a la API de Expensr"}
