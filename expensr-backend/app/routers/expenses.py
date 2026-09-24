@@ -1,4 +1,7 @@
+from typing import Annotated
+
 from fastapi import APIRouter, File, UploadFile
+
 from app.models.expense import ExpenseCreate, ExpenseResponse
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -45,7 +48,7 @@ def create_expense(expense: ExpenseCreate):
 
 # Endpoint para subir el archivo de la factura
 @router.post("/upload")
-async def upload_invoice(file: UploadFile = File(...)):
+async def upload_invoice(file: Annotated[UploadFile, File()]):
     # Simulación de extracción de datos (posteriormente se integrará IA / OCR)
     new_id = len(fake_expenses) + 1 if fake_expenses else 1
     extracted_expense = {

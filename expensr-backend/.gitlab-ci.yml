@@ -1,0 +1,15 @@
+stages:
+  - build
+  - test
+
+build_backend:
+  stage: build
+  image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+  script:
+    - uv sync
+
+test_backend:
+  stage: test
+  image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+  script:
+    - uv run ruff check .
