@@ -10,6 +10,7 @@ dependencies = [
     "ruff>=0.16.8",
     "sqlalchemy>=2.0.54",
     "uvicorn>=0.53.0",
+    "psycopg[binary]>=3.2",
 ]
 [tool.pyright]
 venvPath = "."

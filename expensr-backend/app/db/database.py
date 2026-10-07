@@ -1,22 +1,24 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# URL para crear la base de datos local SQLite en la raíz de backend
-SQLALCHEMY_DATABASE_URL = "sqlite:///./expensr.db"
-
-# Creación del motor de base de datos
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://expensr:expensr@localhost:5432/expensr",
 )
 
-# Creador de sesiones de base de datos
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_engine(DATABASE_URL)
 
-# Clase base de la que heredarán nuestros modelos ORM
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
 Base = declarative_base()
 
 
-# Inyector de dependencia para abrir y cerrar sesión en cada petición HTTP
 def get_db():
     db = SessionLocal()
     try:
