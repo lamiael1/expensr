@@ -1,11 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.database import Base, engine
 from app.routers import chat, expenses, monitor
 
-# Crea las tablas en expensr.db al iniciar la aplicación
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Expensr API",
