@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: expensr-postgres
+    environment:
+      POSTGRES_DB: expensr
+      POSTGRES_USER: expensr
+      POSTGRES_PASSWORD: expensr
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
