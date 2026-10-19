@@ -5,7 +5,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, expenses, monitor
+from app.routers import chat, expenses, monitor, ocr
 
 app = FastAPI(
     title="Expensr API",
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(expenses.router)
 app.include_router(chat.router)
 app.include_router(monitor.router)
+app.include_router(ocr.router)
 
 
 @app.get("/")

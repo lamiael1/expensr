@@ -60,13 +60,17 @@ async def ask_chat(
             function_called=None,
         )
 
-    function_call = None
-    for part in first.candidates[0].content.parts:
-        if part.function_call:
-            function_call = part.function_call
-            break
+    candidate = first.candidates[0] if first.candidates else None
+    parts = candidate.content.parts if candidate and candidate.content else None
 
-    if function_call is None:
+    function_call = None
+    if parts:
+        for part in parts:
+            if part.function_call:
+                function_call = part.function_call
+                break
+
+    if function_call is None or not function_call.name:
         return ChatResponse(response=first.text or "", function_called=None)
 
     function_name = function_call.name
@@ -84,7 +88,9 @@ async def ask_chat(
             logger.warning("Argumentos inválidos para %s: %s", function_name, exc)
             function_result = {"error": "Argumentos inválidos para la función."}
 
-    contents.append(first.candidates[0].content)
+    if candidate and candidate.content:
+        contents.append(candidate.content)
+
     contents.append(
         types.Content(
             role="user",

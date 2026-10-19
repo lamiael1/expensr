@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, Column, Date, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Numeric, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
 
@@ -8,31 +10,36 @@ from app.db.database import Base
 class ExpenseDB(Base):
     __tablename__ = "gastos"
 
-    id = Column(Integer, primary_key=True, index=True)
-    empleado = Column(String(100), nullable=False)
-    fecha = Column(Date, nullable=False)
-    concepto = Column(String(255), nullable=False)
-    categoria = Column(String(100), nullable=False)
-    importe = Column(Numeric(10, 2), nullable=False)
-    adjunto_url = Column(Text, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    empleado: Mapped[str] = mapped_column(String(100))
+    fecha: Mapped[date] = mapped_column(Date)
+    concepto: Mapped[str] = mapped_column(String(255))
+    categoria: Mapped[str] = mapped_column(String(100))
+    importe: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    adjunto_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Campos gestionados por IBM BAW
-    centro_coste = Column(String(100), nullable=True)
-    requiere_revision_manager = Column(Boolean, nullable=False, default=False)
-    estado = Column(String(50), nullable=False, default="PENDIENTE_BAW")
-    comentario_baw = Column(Text, nullable=True)
-    fecha_validacion_baw = Column(DateTime(timezone=True), nullable=True)
+    centro_coste: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    requiere_revision_manager: Mapped[bool] = mapped_column(Boolean, default=False)
+    estado: Mapped[str] = mapped_column(String(50), default="PENDIENTE_BAW")
+    comentario_baw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fecha_validacion_baw: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Campos gestionados por Appian
-    acumulado_mes = Column(Numeric(10, 2), nullable=True)
-    presupuesto_restante = Column(Numeric(10, 2), nullable=True)
-    decision_final = Column(String(50), nullable=True)
-    comentario_appian = Column(Text, nullable=True)
-    fecha_decision_appian = Column(DateTime(timezone=True), nullable=True)
+    acumulado_mes: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    presupuesto_restante: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), nullable=True
+    )
+    decision_final: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    comentario_appian: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fecha_decision_appian: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Trazabilidad
-    fecha_creacion = Column(
+    fecha_creacion: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        nullable=False,
         default=datetime.utcnow,
     )
