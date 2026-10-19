@@ -1,4 +1,3 @@
-
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -61,18 +60,14 @@ def get_monitor_overview(
 
     approved = (
         db.query(func.count(ExpenseDB.id))
-        .filter(
-            ExpenseDB.estado.in_(["APROBADO", "APROBADO_BAW"])
-        )
+        .filter(ExpenseDB.estado.in_(["APROBADO", "APROBADO_BAW"]))
         .scalar()
         or 0
     )
 
     rejected = (
         db.query(func.count(ExpenseDB.id))
-        .filter(
-            ExpenseDB.estado.in_(["RECHAZADO", "RECHAZADO_BAW"])
-        )
+        .filter(ExpenseDB.estado.in_(["RECHAZADO", "RECHAZADO_BAW"]))
         .scalar()
         or 0
     )
@@ -90,10 +85,7 @@ def get_monitor_overview(
     )
 
     expenses = (
-        db.query(ExpenseDB)
-        .order_by(ExpenseDB.fecha_creacion.desc())
-        .limit(100)
-        .all()
+        db.query(ExpenseDB).order_by(ExpenseDB.fecha_creacion.desc()).limit(100).all()
     )
 
     instancias = []
@@ -127,16 +119,10 @@ def get_monitor_overview(
                 importe=float(expense.importe),
                 sistema=sistema,
                 etapa_actual=etapa,
-                prioridad=(
-                    "Alta"
-                    if expense.requiere_revision_manager
-                    else "Normal"
-                ),
+                prioridad=("Alta" if expense.requiere_revision_manager else "Normal"),
                 estado=estado,
                 fecha_creacion=(
-                    expense.fecha_creacion.isoformat()
-                    if expense.fecha_creacion
-                    else ""
+                    expense.fecha_creacion.isoformat() if expense.fecha_creacion else ""
                 ),
             )
         )

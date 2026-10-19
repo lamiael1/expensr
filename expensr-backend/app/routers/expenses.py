@@ -1,5 +1,4 @@
-from datetime import date
-
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
@@ -52,7 +51,7 @@ async def upload_invoice(
     # Se sustituirá por el endpoint /extract-invoice en la fase de IA.
     extracted_expense = ExpenseDB(
         empleado="empleado_007",
-        fecha=date.today(),
+        fecha=datetime.now(UTC).date(),
         concepto=f"Factura: {file.filename}",
         categoria="Procesado por Factura",
         importe=120.50,

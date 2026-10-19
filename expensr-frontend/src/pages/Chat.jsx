@@ -19,13 +19,18 @@ function Chat() {
     setMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
     setLoading(true);
 
+    const storedUser = JSON.parse(localStorage.getItem('expensr_user') || '{}');
+
     try {
-      const response = await fetch('http://localhost:8000/chat', {
+      const response = await fetch('http://localhost:8000/chat/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({
+          message: userMessage,
+          empleado: storedUser.empleado || 'empleado_007',
+        }),
       });
 
       if (!response.ok) {
@@ -33,7 +38,7 @@ function Chat() {
       }
 
       const data = await response.json();
-      setMessages((prev) => [...prev, { sender: 'assistant', text: data.reply }]);
+      setMessages((prev) => [...prev, { sender: 'assistant', text: data.response }]);
     } catch (error) {
       console.error(error);
       setMessages((prev) => [
