@@ -1,3 +1,4 @@
+
 import { NavLink, useNavigate } from "react-router-dom";
 
 function Sidebar() {
@@ -10,7 +11,13 @@ function Sidebar() {
     { ruta: "/monitor", nombre: "Monitoreo", icono: "◉" },
   ];
 
-  const user = JSON.parse(localStorage.getItem("expensr_user") || "{}");
+  const user = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("expensr_user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
   const handleLogout = () => {
     localStorage.removeItem("expensr_user");
@@ -18,20 +25,19 @@ function Sidebar() {
   };
 
   return (
-    <aside className="w-64 min-h-screen bg-slate-950 text-white flex flex-col border-r border-slate-800">
+    <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-white">
       {/* Logo */}
-      <div className="px-5 pt-6 pb-6 border-b border-slate-800">
+      <div className="border-b border-slate-800 px-5 py-6">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center shadow-sm">
-            <span className="text-slate-950 font-black text-xl">E</span>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+            <span className="text-xl font-black text-slate-950">E</span>
           </div>
 
-          <div>
-            <h1 className="!text-white text-3xl font-extrabold tracking-tight">
+          <div className="min-w-0">
+            <h1 className="!m-0 !text-3xl !font-extrabold !tracking-tight !text-white">
               Expensr
             </h1>
-
-            <p className="!text-slate-300 text-xs mt-1 font-medium">
+            <p className="!mt-1 !text-xs !font-medium !text-slate-300">
               Gestión de gastos
             </p>
           </div>
@@ -40,25 +46,25 @@ function Sidebar() {
 
       {/* Usuario */}
       <div className="px-4 py-5">
-        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-900 border border-slate-800">
-          <div className="w-10 h-10 shrink-0 rounded-full bg-slate-700 flex items-center justify-center text-white font-semibold">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-700 font-semibold !text-white">
             {(user.nombre || "E").charAt(0).toUpperCase()}
           </div>
 
           <div className="min-w-0">
-            <p className="text-white text-sm font-semibold truncate">
+            <p className="truncate !text-sm !font-semibold !text-white">
               {user.nombre || "Empleado"}
             </p>
-            <p className="text-slate-400 text-xs truncate mt-0.5">
+            <p className="mt-0.5 truncate !text-xs !text-slate-400">
               {user.empleado || "empleado_007"}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Menú */}
-      <nav className="flex-1 px-3">
-        <p className="px-3 mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+      {/* Navegación */}
+      <nav aria-label="Navegación principal" className="flex-1 px-3">
+        <p className="mb-3 px-3 !text-[11px] !font-bold uppercase !tracking-widest !text-slate-500">
           Navegación
         </p>
 
@@ -67,27 +73,37 @@ function Sidebar() {
             <NavLink
               key={p.ruta}
               to={p.ruta}
+              style={({ isActive }) => ({
+                color: isActive ? "#ffffff" : "#cbd5e1",
+                backgroundColor: isActive ? "#4f46e5" : "transparent",
+              })}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-all ${
+                `flex items-center gap-3 rounded-xl px-3 py-3 !no-underline transition-colors duration-150 ${
                   isActive
-                    ? "bg-white text-slate-950 font-semibold shadow-md"
-                    : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                    ? "font-semibold shadow-md"
+                    : "font-medium hover:bg-slate-900 hover:!text-white"
                 }`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-                      isActive
-                        ? "bg-slate-100 text-slate-950"
-                        : "bg-slate-900 text-slate-400"
-                    }`}
+                    aria-hidden="true"
+                    style={{
+                      color: isActive ? "#ffffff" : "#94a3b8",
+                      backgroundColor: isActive ? "#4338ca" : "#0f172a",
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold"
                   >
                     {p.icono}
                   </span>
 
-                  <span>{p.nombre}</span>
+                  <span
+                    style={{ color: isActive ? "#ffffff" : "#cbd5e1" }}
+                    className="!text-sm"
+                  >
+                    {p.nombre}
+                  </span>
                 </>
               )}
             </NavLink>
@@ -96,15 +112,15 @@ function Sidebar() {
       </nav>
 
       {/* Cerrar sesión */}
-      <div className="p-4 border-t border-slate-800">
+      <div className="border-t border-slate-800 p-4">
         <button
+          type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-300 hover:bg-red-950/50 hover:text-red-300 transition-colors"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 !text-sm !text-slate-300 transition-colors hover:bg-red-950/50 hover:!text-red-300"
         >
-          <span className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900">
             ↪
           </span>
-
           <span className="font-medium">Cerrar sesión</span>
         </button>
       </div>
