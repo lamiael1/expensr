@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sendChatMessage } from '../services/api';
 
 function Chat() {
   const [messages, setMessages] = useState([
@@ -22,22 +23,10 @@ function Chat() {
     const storedUser = JSON.parse(localStorage.getItem('expensr_user') || '{}');
 
     try {
-      const response = await fetch('http://localhost:8000/chat/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          empleado: storedUser.empleado || 'empleado_007',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error en la comunicación con el servidor');
-      }
-
-      const data = await response.json();
+      const data = await sendChatMessage(
+        userMessage,
+        storedUser.empleado || 'empleado_007',
+      );
       setMessages((prev) => [...prev, { sender: 'assistant', text: data.response }]);
     } catch (error) {
       console.error(error);

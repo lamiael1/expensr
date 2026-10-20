@@ -15,8 +15,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-client = genai.Client()  # lee GEMINI_API_KEY del entorno
-MODEL = "gemini-3.8-flash"
+client = genai.Client(  # lee GEMINI_API_KEY del entorno
+    http_options=types.HttpOptions(
+        timeout=15_000,  # milisegundos
+        retry_options=types.HttpRetryOptions(attempts=1),
+    )
+)
+
+# Modelo principal primero; los siguientes son reserva si Google está saturado.
+MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash"]
+RETRIABLE_CODES = {429, 500, 502, 503, 504}
 
 SYSTEM_PROMPT = (
     "Eres el asistente de Expensr, una app de gestión de gastos. "
@@ -37,6 +45,32 @@ class ChatResponse(BaseModel):
     function_called: str | None = None
 
 
+def _generate(contents, config, preferred: str | None = None):
+    """Llama a Gemini probando cada modelo; salta al siguiente si está saturado."""
+    models = list(MODELS)
+    if preferred in models:
+        models.remove(preferred)
+        models.insert(0, preferred)
+
+    last_error: APIError | None = None
+    for model in models:
+        try:
+            response = client.models.generate_content(
+                model=model, contents=contents, config=config
+            )
+            return response, model
+        except APIError as exc:
+            if exc.code not in RETRIABLE_CODES:
+                raise
+            logger.warning(
+                "Modelo %s no disponible (%s), probando otro", model, exc.code
+            )
+            last_error = exc
+
+    assert last_error is not None
+    raise last_error
+
+
 @router.post("/", response_model=ChatResponse)
 async def ask_chat(
     request: Annotated[ChatRequest, Body()],
@@ -50,9 +84,7 @@ async def ask_chat(
     )
 
     try:
-        first = client.models.generate_content(
-            model=MODEL, contents=contents, config=config
-        )
+        first, used_model = _generate(contents, config)
     except APIError:
         logger.exception("Error llamando a Gemini (primera pasada)")
         return ChatResponse(
@@ -106,9 +138,7 @@ async def ask_chat(
     )
 
     try:
-        second = client.models.generate_content(
-            model=MODEL, contents=contents, config=config
-        )
+        second, _ = _generate(contents, config, preferred=used_model)
     except APIError:
         logger.exception("Error llamando a Gemini (segunda pasada)")
         return ChatResponse(

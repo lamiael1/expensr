@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getExpenses } from "../services/api";
 
 function Gastos() {
   const [gastos, setGastos] = useState([]);
@@ -6,8 +7,7 @@ function Gastos() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/expenses")
-      .then((res) => res.json())
+    getExpenses()
       .then(setGastos)
       .catch(() => setError("No se pudieron cargar los gastos."))
       .finally(() => setCargando(false));
