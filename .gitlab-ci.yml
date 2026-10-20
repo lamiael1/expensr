@@ -1,69 +1,36 @@
-
 stages:
-
   - build
-
   - check
 
-
-
 variables:
-
   UV_CACHE_DIR: "$CI_PROJECT_DIR/.uv-cache"
 
-
-
 default:
-
   image: ghcr.io/astral-sh/uv:python3.14-bookworm-slim
-
   cache:
-
     key: "$CI_COMMIT_REF_SLUG-uv"
-
     paths:
-
       - .uv-cache/
 
-
-
 build_backend:
-
   stage: build
-
   script:
-
     - cd expensr-backend
-
     - uv sync --frozen
-
-
 
 lint_backend:
-
   stage: check
-
   script:
-
     - cd expensr-backend
-
     - uv sync --frozen
-
     - uv run ruff check .
-
     - uv run ruff format --check .
 
-
-
 test_backend:
-
   stage: check
-
+  variables:
+    GEMINI_API_KEY: "test-key-ci-not-real"
   script:
-
     - cd expensr-backend
-
     - uv sync --frozen
-
     - uv run pytest -v
-
