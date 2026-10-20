@@ -16,3 +16,13 @@ dependencies = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "httpx2>=2.15.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

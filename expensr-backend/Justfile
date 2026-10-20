@@ -14,3 +14,12 @@ format:
 check:
     uv run ruff check .
     uv run ruff format --check .
+    uv run pytest
+
+# Ejecutar la suite de tests
+test:
+    uv run pytest -v
+
+# Tests con cobertura
+test-cov:
+    uv run pytest --cov=app --cov-report=term-missing
