@@ -9,6 +9,7 @@ venv/
 # Variables de entorno
 .env
 .env.*
+!.env.example
 
 # FastAPI
 *.log
