@@ -7,6 +7,21 @@ from sqlalchemy.pool import StaticPool
 from app.db.database import Base, get_db
 from app.main import app
 
+VARIABLES_EXTERNAS = (
+    "BAW_BASE_URL",
+    "BAW_USER",
+    "BAW_PASSWORD",
+    "APPIAN_BASE_URL",
+    "APPIAN_API_KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def sin_credenciales_externas(monkeypatch):
+    """Los tests nunca deben depender del .env ni llamar a BAW/Appian reales."""
+    for nombre in VARIABLES_EXTERNAS:
+        monkeypatch.delenv(nombre, raising=False)
+
 
 @pytest.fixture()
 def db_session():

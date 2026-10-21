@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
@@ -15,14 +16,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-client = genai.Client(  # lee GEMINI_API_KEY del entorno
+# Identidad fija de la demo, establecida en el backend.
+DEMO_EMPLOYEE = os.getenv("DEMO_EMPLOYEE", "empleado_007")
+
+client = genai.Client(
     http_options=types.HttpOptions(
-        timeout=15_000,  # milisegundos
+        timeout=15_000,
         retry_options=types.HttpRetryOptions(attempts=1),
     )
 )
 
-# Modelo principal primero; los siguientes son reserva si Google está saturado.
 MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash"]
 RETRIABLE_CODES = {429, 500, 502, 503, 504}
 
@@ -37,7 +40,6 @@ SYSTEM_PROMPT = (
 
 class ChatRequest(BaseModel):
     message: str
-    empleado: str = "empleado_007"
 
 
 class ChatResponse(BaseModel):
@@ -88,7 +90,10 @@ async def ask_chat(
     except APIError:
         logger.exception("Error llamando a Gemini (primera pasada)")
         return ChatResponse(
-            response="No he podido conectar con el asistente de IA. Inténtalo de nuevo en unos segundos.",
+            response=(
+                "No he podido conectar con el asistente de IA. "
+                "Inténtalo de nuevo en unos segundos."
+            ),
             function_called=None,
         )
 
@@ -113,9 +118,14 @@ async def ask_chat(
     if impl is None:
         function_result = {"error": f"Función desconocida: {function_name}"}
     else:
-        args.pop("empleado", None)  # guardarraíl: nunca lo decide el modelo
+        # El modelo no elige el empleado: siempre se usa la identidad de demo.
+        args.pop("empleado", None)
         try:
-            function_result = impl(db=db, empleado=request.empleado, **args)
+            function_result = impl(
+                db=db,
+                empleado=DEMO_EMPLOYEE,
+                **args,
+            )
         except TypeError as exc:
             logger.warning("Argumentos inválidos para %s: %s", function_name, exc)
             function_result = {"error": "Argumentos inválidos para la función."}
@@ -142,8 +152,14 @@ async def ask_chat(
     except APIError:
         logger.exception("Error llamando a Gemini (segunda pasada)")
         return ChatResponse(
-            response="He consultado los datos pero no he podido redactar la respuesta. Inténtalo de nuevo.",
+            response=(
+                "He consultado los datos pero no he podido redactar la respuesta. "
+                "Inténtalo de nuevo."
+            ),
             function_called=function_name,
         )
 
-    return ChatResponse(response=second.text or "", function_called=function_name)
+    return ChatResponse(
+        response=second.text or "",
+        function_called=function_name,
+    )

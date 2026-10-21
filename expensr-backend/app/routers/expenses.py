@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,10 +10,19 @@ from app.models.expense_db import ExpenseDB
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
+# Identidad fija para la demo. El backend no confía en el empleado
+# enviado en el cuerpo de la petición por el frontend.
+DEMO_EMPLOYEE = os.getenv("DEMO_EMPLOYEE", "empleado_007")
+
 
 @router.get("/", response_model=list[ExpenseResponse])
 def get_expenses(db: Annotated[Session, Depends(get_db)]):
-    return db.query(ExpenseDB).order_by(ExpenseDB.fecha_creacion.desc()).all()
+    return (
+        db.query(ExpenseDB)
+        .filter(ExpenseDB.empleado == DEMO_EMPLOYEE)
+        .order_by(ExpenseDB.fecha_creacion.desc())
+        .all()
+    )
 
 
 @router.get("/{gasto_id}", response_model=ExpenseResponse)
@@ -20,7 +30,14 @@ def get_expense(
     gasto_id: int,
     db: Annotated[Session, Depends(get_db)],
 ):
-    gasto = db.query(ExpenseDB).filter(ExpenseDB.id == gasto_id).first()
+    gasto = (
+        db.query(ExpenseDB)
+        .filter(
+            ExpenseDB.id == gasto_id,
+            ExpenseDB.empleado == DEMO_EMPLOYEE,
+        )
+        .first()
+    )
 
     if gasto is None:
         raise HTTPException(
@@ -37,7 +54,7 @@ def create_expense(
     db: Annotated[Session, Depends(get_db)],
 ):
     db_expense = ExpenseDB(
-        empleado=expense.empleado,
+        empleado=DEMO_EMPLOYEE,
         fecha=expense.fecha,
         concepto=expense.concepto,
         categoria=expense.categoria,

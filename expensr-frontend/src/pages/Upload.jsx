@@ -1,4 +1,3 @@
-
 import { useRef, useState } from "react";
 import { extractInvoice, createExpense } from "../services/api";
 
@@ -18,7 +17,9 @@ function Upload() {
   const seleccionarArchivo = (file) => {
     if (!file) return;
 
-    const esPDF = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const esPDF =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
     const esImagen = file.type.startsWith("image/");
 
     if (!esPDF && !esImagen) {
@@ -84,7 +85,7 @@ function Upload() {
     }
 
     if (!datos.fecha || !datos.concepto.trim()) {
-      setError("Completa la fecha y el concepto antes de continuar.");
+      setError("Completa la fecha y el concepto antes de registrar el gasto.");
       return;
     }
 
@@ -94,7 +95,7 @@ function Upload() {
       } catch {
         return {};
       }
-      })();
+    })();
 
     setEnviando(true);
     setError("");
@@ -110,7 +111,9 @@ function Upload() {
         adjunto_url: archivo?.name ?? null,
       });
 
-      setExito("Gasto enviado a validación correctamente.");
+      setExito(
+        "Gasto registrado en Expensr como PENDIENTE_BAW. Todavía no se ha enviado a BAW.",
+      );
       setArchivo(null);
       setDatos(null);
 
@@ -118,7 +121,7 @@ function Upload() {
         inputRef.current.value = "";
       }
     } catch (err) {
-      setError(err.message || "No se pudo enviar el gasto.");
+      setError(err.message || "No se pudo registrar el gasto.");
     } finally {
       setEnviando(false);
     }
@@ -143,7 +146,6 @@ function Upload() {
 
   return (
     <section className="mx-auto w-full max-w-5xl space-y-8">
-      {/* Cabecera */}
       <header className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
           Gestión de gastos
@@ -155,17 +157,24 @@ function Upload() {
 
         <p className="max-w-2xl text-sm leading-6 text-slate-500">
           Sube el justificante de tu gasto. Extraeremos los datos
-          automáticamente para que puedas revisarlos antes de enviarlos a
-          validación.
+          automáticamente para que puedas revisarlos antes de registrar el gasto
+          en Expensr.
         </p>
       </header>
 
-      {/* Pasos del proceso */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { numero: "01", titulo: "Sube la factura", detalle: "PDF o imagen" },
-          { numero: "02", titulo: "Revisa los datos", detalle: "Extracción automática" },
-          { numero: "03", titulo: "Envía el gasto", detalle: "Para su validación" },
+          {
+            numero: "02",
+            titulo: "Revisa los datos",
+            detalle: "Extracción automática",
+          },
+          {
+            numero: "03",
+            titulo: "Registra el gasto",
+            detalle: "Quedará pendiente de validación BAW",
+          },
         ].map((paso, indice) => {
           const completado =
             (indice === 0 && Boolean(archivo)) ||
@@ -202,15 +211,14 @@ function Upload() {
         })}
       </div>
 
-      {/* Selección del archivo */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <div className="mb-5">
           <h3 className="!m-0 !text-lg !font-semibold !text-slate-900">
             1. Selecciona tu justificante
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Puedes arrastrar el archivo a la zona inferior o seleccionarlo
-            desde tu dispositivo.
+            Puedes arrastrar el archivo a la zona inferior o seleccionarlo desde
+            tu dispositivo.
           </p>
         </div>
 
@@ -313,7 +321,6 @@ function Upload() {
         )}
       </section>
 
-      {/* Formulario de revisión */}
       {datos && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div className="mb-6">
@@ -325,7 +332,7 @@ function Upload() {
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               La extracción automática puede contener errores. Comprueba los
-              campos antes de enviar el gasto.
+              campos antes de registrar el gasto.
             </p>
           </div>
 
@@ -362,7 +369,9 @@ function Upload() {
                     step="0.01"
                     min="0.01"
                     value={datos.importe}
-                    onChange={(e) => handleCampoChange("importe", e.target.value)}
+                    onChange={(e) =>
+                      handleCampoChange("importe", e.target.value)
+                    }
                     placeholder="0,00"
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     required
@@ -436,14 +445,13 @@ function Upload() {
                 disabled={enviando || extrayendo}
                 className="rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {enviando ? "Enviando gasto..." : "Enviar a validación"}
+                {enviando ? "Registrando gasto..." : "Registrar gasto"}
               </button>
             </div>
           </form>
         </section>
       )}
 
-      {/* Mensajes de estado */}
       {error && (
         <div
           role="alert"
