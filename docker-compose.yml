@@ -30,5 +30,16 @@ services:
       postgres:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ./expensr-frontend
+    container_name: expensr-frontend
+    environment:
+      VITE_API_URL: http://127.0.0.1:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
