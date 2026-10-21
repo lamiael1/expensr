@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expensr-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: expensr-backend
+  template:
+    metadata:
+      labels:
+        app: expensr-backend
+    spec:
+      containers:
+        - name: backend
+          image: proyectoexpensr-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: expensr-backend-env
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: expensr-db-connection
+                  key: DATABASE_URL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: expensr-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: expensr-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
