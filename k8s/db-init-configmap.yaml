@@ -1,0 +1,107 @@
+apiVersion: v1
+data:
+  001_create_schema.sql: |
+    CREATE TABLE IF NOT EXISTS gastos (
+        id BIGSERIAL PRIMARY KEY,
+        empleado VARCHAR(100) NOT NULL,
+        fecha DATE NOT NULL,
+        concepto VARCHAR(255) NOT NULL,
+        categoria VARCHAR(100) NOT NULL,
+        importe NUMERIC(10, 2) NOT NULL CHECK (importe >= 0),
+        adjunto_url TEXT,
+
+        centro_coste VARCHAR(100),
+        requiere_revision_manager BOOLEAN NOT NULL DEFAULT FALSE,
+        estado VARCHAR(50) NOT NULL DEFAULT 'PENDIENTE_BAW',
+        comentario_baw TEXT,
+        fecha_validacion_baw TIMESTAMPTZ,
+
+        acumulado_mes NUMERIC(10, 2),
+        presupuesto_restante NUMERIC(10, 2),
+        decision_final VARCHAR(50),
+        comentario_appian TEXT,
+        fecha_decision_appian TIMESTAMPTZ,
+
+        fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS presupuestos (
+        id BIGSERIAL PRIMARY KEY,
+        empleado VARCHAR(100) NOT NULL,
+        categoria VARCHAR(100) NOT NULL,
+        limite_mensual NUMERIC(10, 2) NOT NULL CHECK (limite_mensual >= 0),
+
+        CONSTRAINT uq_presupuesto_empleado_categoria
+            UNIQUE (empleado, categoria)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_gastos_empleado
+        ON gastos (empleado);
+
+    CREATE INDEX IF NOT EXISTS idx_gastos_estado
+        ON gastos (estado);
+
+    CREATE INDEX IF NOT EXISTS idx_gastos_fecha_creacion
+        ON gastos (fecha_creacion);
+  002_seed.sql: |
+    INSERT INTO presupuestos (empleado, categoria, limite_mensual)
+    VALUES
+        ('empleado_007', 'Dietas', 500.00),
+        ('empleado_007', 'Transporte', 300.00),
+        ('empleado_007', 'Material', 400.00),
+        ('empleado_007', 'Formacion', 600.00)
+    ON CONFLICT (empleado, categoria) DO NOTHING;
+
+
+    INSERT INTO gastos (
+        empleado,
+        fecha,
+        concepto,
+        categoria,
+        importe,
+        adjunto_url,
+        centro_coste,
+        requiere_revision_manager,
+        estado,
+        fecha_creacion
+    )
+    VALUES
+        (
+            'empleado_007',
+            CURRENT_DATE - INTERVAL '5 days',
+            'Comida con cliente',
+            'Dietas',
+            85.50,
+            NULL,
+            'CC-100',
+            FALSE,
+            'PENDIENTE_BAW',
+            CURRENT_TIMESTAMP - INTERVAL '5 days'
+        ),
+        (
+            'empleado_007',
+            CURRENT_DATE - INTERVAL '3 days',
+            'Taxi aeropuerto',
+            'Transporte',
+            42.00,
+            NULL,
+            'CC-100',
+            FALSE,
+            'PENDIENTE_BAW',
+            CURRENT_TIMESTAMP - INTERVAL '3 days'
+        ),
+        (
+            'empleado_007',
+            CURRENT_DATE - INTERVAL '1 day',
+            'Material de oficina',
+            'Material',
+            120.00,
+            NULL,
+            'CC-100',
+            FALSE,
+            'PENDIENTE_BAW',
+            CURRENT_TIMESTAMP - INTERVAL '1 day'
+        );
+kind: ConfigMap
+metadata:
+  name: expensr-db-init
