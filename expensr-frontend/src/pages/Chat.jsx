@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { sendChatMessage } from '../services/api';
 
 const CHAT_STORAGE_KEY = 'expensr_chat_messages';
@@ -9,6 +10,22 @@ const INITIAL_MESSAGES = [
     text: '¡Hola! Soy el asistente de Expensr. Pregúntame sobre tus gastos o estados pendientes.',
   },
 ];
+
+const markdownComponents = {
+  p: ({ children }) => (
+    <p className="whitespace-pre-wrap">{children}</p>
+  ),
+  strong: ({ children }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>
+  ),
+  ul: ({ children }) => (
+    <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>
+  ),
+  li: ({ children }) => <li>{children}</li>,
+};
 
 function getInitialMessages() {
   try {
@@ -42,7 +59,10 @@ function Chat() {
     try {
       sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
     } catch (error) {
-      console.warn('No se pudo guardar el historial del chat en esta sesión.', error);
+      console.warn(
+        'No se pudo guardar el historial del chat en esta sesión.',
+        error,
+      );
     }
   }, [messages]);
 
@@ -55,10 +75,12 @@ function Chat() {
 
     const userMessage = input.trim();
     setInput('');
+
     setMessages((previousMessages) => [
       ...previousMessages,
       { sender: 'user', text: userMessage },
     ]);
+
     setLoading(true);
 
     try {
@@ -93,7 +115,7 @@ function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] max-w-4xl mx-auto p-4 bg-white rounded-lg shadow-md">
+    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-4xl flex-col rounded-lg bg-white p-4 shadow-md">
       <div className="mb-4 border-b pb-3">
         <h2 className="text-xl font-semibold text-gray-800">
           Asistente Virtual - Expensr
@@ -103,7 +125,7 @@ function Chat() {
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-gray-50 rounded-lg mb-4">
+      <div className="mb-4 flex-1 space-y-4 overflow-y-auto rounded-lg bg-gray-50 p-4">
         {messages.map((message, index) => (
           <div
             key={`${message.sender}-${index}`}
@@ -112,20 +134,26 @@ function Chat() {
             }`}
           >
             <div
-              className={`max-w-[75%] p-3 rounded-lg text-sm ${
+              className={`max-w-[75%] rounded-lg p-3 text-sm ${
                 message.sender === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-none'
-                  : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
+                  ? 'rounded-br-none bg-blue-600 text-white'
+                  : 'rounded-bl-none border border-gray-200 bg-white text-gray-800 shadow-sm'
               }`}
             >
-              {message.text}
+              {message.sender === 'assistant' ? (
+                <ReactMarkdown components={markdownComponents}>
+                  {message.text}
+                </ReactMarkdown>
+              ) : (
+                message.text
+              )}
             </div>
           </div>
         ))}
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white text-gray-500 border border-gray-200 p-3 rounded-lg text-sm italic shadow-sm">
+            <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm italic text-gray-500 shadow-sm">
               Pensando respuesta...
             </div>
           </div>
@@ -138,12 +166,12 @@ function Chat() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Escribe tu mensaje (ej. '¿Cuánto tengo en gastos?' o 'estado')..."
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
         >
           Enviar
         </button>
