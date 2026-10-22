@@ -15,7 +15,7 @@ Crea el archivo `.env` a partir de la plantilla:
 cp .env.example .env
 ```
 
-En `.env`, configura las credenciales de PostgreSQL. Para la base de datos que ya tienes, usa:
+Configura las credenciales de PostgreSQL en `.env`:
 
 ```ini
 POSTGRES_DB=expensr
@@ -23,9 +23,9 @@ POSTGRES_USER=expensr
 POSTGRES_PASSWORD=expensr
 ```
 
-No subas `.env` a Git.
+> No subas el archivo `.env` al repositorio.
 
-## Iniciar la aplicación con Docker Compose
+## Arranque con Docker Compose
 
 Desde la raíz del proyecto:
 
@@ -33,49 +33,70 @@ Desde la raíz del proyecto:
 docker compose up --build -d
 ```
 
-Abre la aplicación en [http://localhost:8081](http://localhost:8081). La API está disponible en [http://localhost:8081/api/](http://localhost:8081/api/).
+Una vez iniciados los contenedores:
 
-Para comprobar los contenedores:
+- Frontend: http://localhost:8081
+- API: http://localhost:8081/api/
+
+Comprobar el estado de los servicios:
 
 ```bash
 docker compose ps
 ```
 
-Para detener la aplicación sin borrar los datos de PostgreSQL:
+Ver logs:
+
+```bash
+docker compose logs -f
+```
+
+Detener la aplicación manteniendo los datos de PostgreSQL:
 
 ```bash
 docker compose down
 ```
 
-Los datos de PostgreSQL se conservan en el volumen de Docker.
+Los datos de la base de datos permanecen almacenados en el volumen Docker configurado para PostgreSQL.
 
 ## Desarrollo local
 
 ### Backend
 
-Desde `expensr-backend`:
+Situarse en `expensr-backend` y ejecutar:
 
 ```bash
 just dev
 ```
 
-La API queda disponible en [http://localhost:8000](http://localhost:8000).
+La API quedará disponible en:
+
+```text
+http://localhost:8000
+```
+
+Documentación OpenAPI:
+
+```text
+http://localhost:8000/docs
+```
 
 ### Frontend
 
-Desde `expensr-frontend`:
+Situarse en `expensr-frontend` y ejecutar:
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-Vite mostrará en la terminal la dirección local del frontend.
+Vite mostrará en la terminal la URL local del frontend.
 
-## ngrok
+## Exposición mediante ngrok
 
-Con FastAPI activo en el puerto 8000, abre otra terminal y ejecuta:
+Con FastAPI ejecutándose en el puerto 8000, abre una nueva terminal:
 
 ```bash
 ngrok http 8000 --url https://tameness-hamburger-proton.ngrok-free.dev
 ```
+
+La API quedará accesible a través de la URL pública configurada en ngrok.
