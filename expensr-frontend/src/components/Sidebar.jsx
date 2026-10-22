@@ -1,4 +1,3 @@
-
 import { NavLink, useNavigate } from "react-router-dom";
 
 function Sidebar() {
@@ -20,13 +19,13 @@ function Sidebar() {
   })();
 
   const handleLogout = () => {
+    sessionStorage.removeItem("expensr_chat_messages");
     localStorage.removeItem("expensr_user");
     navigate("/login", { replace: true });
   };
 
   return (
     <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-white">
-      {/* Logo */}
       <div className="border-b border-slate-800 px-5 py-6">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
@@ -44,7 +43,6 @@ function Sidebar() {
         </div>
       </div>
 
-      {/* Usuario */}
       <div className="px-4 py-5">
         <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-700 font-semibold !text-white">
@@ -62,7 +60,6 @@ function Sidebar() {
         </div>
       </div>
 
-      {/* Navegación */}
       <nav aria-label="Navegación principal" className="flex-1 px-3">
         <p className="mb-3 px-3 !text-[11px] !font-bold uppercase !tracking-widest !text-slate-500">
           Navegación
@@ -111,7 +108,6 @@ function Sidebar() {
         </div>
       </nav>
 
-      {/* Cerrar sesión */}
       <div className="border-t border-slate-800 p-4">
         <button
           type="button"

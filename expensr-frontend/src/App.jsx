@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import Upload from "./pages/Upload";
 import Gastos from "./pages/Gastos";
-import Chat from "./pages/Chat";
+import Chat from "./components/Chat";
 import Monitor from "./pages/Monitor";
 import Login from "./pages/Login";
 
