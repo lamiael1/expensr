@@ -33,6 +33,13 @@ spec:
           ports:
             - name: postgres
               containerPort: 5432
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
           envFrom:
             - secretRef:
                 name: expensr-db-credentials
