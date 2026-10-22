@@ -24,8 +24,6 @@ services:
       - ./expensr-backend/.env
     environment:
       DATABASE_URL: postgresql+psycopg://expensr:expensr@postgres:5432/expensr
-    ports:
-      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,11 +31,13 @@ services:
   frontend:
     build:
       context: ./expensr-frontend
+      args:
+        VITE_API_URL: /api
     container_name: expensr-frontend
     environment:
-      VITE_API_URL: http://127.0.0.1:8000
+      BACKEND_HOST: backend
     ports:
-      - "5173:5173"
+      - "8081:80"
     depends_on:
       - backend
 

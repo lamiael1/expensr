@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -9,6 +9,16 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-EXPOSE 5173
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
 
-CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+RUN pnpm build
+
+FROM nginx:alpine
+
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
