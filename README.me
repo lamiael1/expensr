@@ -1,6 +1,81 @@
+# Expensr
+
+Aplicación de gestión de gastos con frontend React + Vite, backend FastAPI y PostgreSQL.
+
+## Requisitos
+
+- Docker
+- Docker Compose
+
+## Configuración local
+
+Crea el archivo `.env` a partir de la plantilla:
+
+```bash
+cp .env.example .env
+```
+
+En `.env`, configura las credenciales de PostgreSQL. Para la base de datos que ya tienes, usa:
+
+```ini
+POSTGRES_DB=expensr
+POSTGRES_USER=expensr
+POSTGRES_PASSWORD=expensr
+```
+
+No subas `.env` a Git.
+
+## Iniciar la aplicación con Docker Compose
+
+Desde la raíz del proyecto:
+
+```bash
+docker compose up --build -d
+```
+
+Abre la aplicación en [http://localhost:8081](http://localhost:8081). La API está disponible en [http://localhost:8081/api/](http://localhost:8081/api/).
+
+Para comprobar los contenedores:
+
+```bash
+docker compose ps
+```
+
+Para detener la aplicación sin borrar los datos de PostgreSQL:
+
+```bash
+docker compose down
+```
+
+Los datos de PostgreSQL se conservan en el volumen de Docker.
+
+## Desarrollo local
+
+### Backend
+
+Desde `expensr-backend`:
+
+```bash
+just dev
+```
+
+La API queda disponible en [http://localhost:8000](http://localhost:8000).
+
+### Frontend
+
+Desde `expensr-frontend`:
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+Vite mostrará en la terminal la dirección local del frontend.
+
 ## ngrok
 
 Con FastAPI activo en el puerto 8000, abre otra terminal y ejecuta:
 
 ```bash
 ngrok http 8000 --url https://tameness-hamburger-proton.ngrok-free.dev
+```
