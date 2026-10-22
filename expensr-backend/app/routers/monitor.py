@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -83,7 +83,7 @@ def _series_tiempos(db: Session, ahora: datetime) -> list[SerieTiempo]:
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    por_dia: dict = {}
+    por_dia: dict[date, dict[str, list[float]]] = {}
     for i in range(DIAS_SERIE):
         dia = (desde + timedelta(days=i)).date()
         por_dia[dia] = {"baw": [], "appian": []}
@@ -91,7 +91,11 @@ def _series_tiempos(db: Session, ahora: datetime) -> list[SerieTiempo]:
     gastos = db.query(ExpenseDB).filter(ExpenseDB.fecha_creacion >= desde).all()
 
     for gasto in gastos:
-        dia = _aware(gasto.fecha_creacion).date()
+        fecha_creacion = _aware(gasto.fecha_creacion)
+        if fecha_creacion is None:
+            continue
+
+        dia = fecha_creacion.date()
         if dia not in por_dia:
             continue
 
