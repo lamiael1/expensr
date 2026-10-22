@@ -18,14 +18,14 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 5173
+              containerPort: 80
           env:
-            - name: VITE_API_URL
-              value: http://127.0.0.1:8001
+            - name: BACKEND_HOST
+              value: expensr-backend
           readinessProbe:
             httpGet:
               path: /
-              port: 5173
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
 ---
@@ -39,5 +39,5 @@ spec:
     app: expensr-frontend
   ports:
     - name: http
-      port: 5173
-      targetPort: 5173
+      port: 80
+      targetPort: 80
