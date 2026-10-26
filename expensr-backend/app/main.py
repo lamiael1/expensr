@@ -12,6 +12,7 @@ app = FastAPI(
     description="API de backend para la gestión de gastos empresarial",
     version="0.1.0",
 )
+app.openapi_version = "3.0.2"
 
 app.add_middleware(
     CORSMiddleware,
