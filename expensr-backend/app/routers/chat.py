@@ -26,7 +26,7 @@ client = genai.Client(
     )
 )
 
-MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash"]
+MODELS = ["gemini-3.5-flash-lite", "gemini-3.6-flash"]
 RETRIABLE_CODES = {429, 500, 502, 503, 504}
 
 SYSTEM_PROMPT = (
