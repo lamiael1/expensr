@@ -10,8 +10,7 @@ from pydantic import BaseModel, ValidationError
 logger = logging.getLogger(__name__)
 
 client = genai.Client()
-MODEL = "gemini-3.8-flash"
-
+MODEL = "gemini-3.6-flash"
 CATEGORIAS_VALIDAS = ["Dietas", "Transporte", "Material", "Formacion"]
 
 OCR_SYSTEM_PROMPT = (
