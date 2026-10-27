@@ -45,12 +45,13 @@ class ChatResponse(BaseModel):
 
 
 def _generate(contents, config):
-    """Genera una respuesta usando Gemini 3.5 Flash Lite."""
-    return client.models.generate_content(
+    """Genera una respuesta con Gemini y devuelve la respuesta y el modelo."""
+    response = client.models.generate_content(
         model=GEMINI_MODEL,
         contents=contents,
         config=config,
     )
+    return response, GEMINI_MODEL
 
 
 @router.post("/", response_model=ChatResponse)
@@ -71,7 +72,7 @@ async def ask_chat(
     )
 
     try:
-        first = _generate(contents, config)
+        first, _ = _generate(contents, config)
     except APIError:
         logger.exception("Error llamando a Gemini 3.5 Flash Lite")
         return ChatResponse(
@@ -135,13 +136,13 @@ async def ask_chat(
     )
 
     try:
-        second = _generate(contents, config)
+        second, _ = _generate(contents, config)
     except APIError:
         logger.exception("Error en la segunda llamada a Gemini 3.5 Flash Lite")
         return ChatResponse(
             response=(
-                "He consultado los datos pero no he podido redactar "
-                "la respuesta. Inténtalo de nuevo."
+                "He consultado los datos pero no he podido redactar la respuesta. "
+                "Inténtalo de nuevo."
             ),
             function_called=function_name,
         )
