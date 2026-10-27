@@ -1,4 +1,7 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: expensr-db-init
 data:
   001_create_schema.sql: |
     CREATE TABLE IF NOT EXISTS gastos (
@@ -21,6 +24,7 @@ data:
         decision_final VARCHAR(50),
         comentario_appian TEXT,
         fecha_decision_appian TIMESTAMPTZ,
+        baw_instance_id VARCHAR(100),
 
         fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -43,6 +47,7 @@ data:
 
     CREATE INDEX IF NOT EXISTS idx_gastos_fecha_creacion
         ON gastos (fecha_creacion);
+
   002_seed.sql: |
     INSERT INTO presupuestos (empleado, categoria, limite_mensual)
     VALUES
@@ -51,7 +56,6 @@ data:
         ('empleado_007', 'Material', 400.00),
         ('empleado_007', 'Formacion', 600.00)
     ON CONFLICT (empleado, categoria) DO NOTHING;
-
 
     INSERT INTO gastos (
         empleado,
@@ -102,6 +106,3 @@ data:
             'PENDIENTE_BAW',
             CURRENT_TIMESTAMP - INTERVAL '1 day'
         );
-kind: ConfigMap
-metadata:
-  name: expensr-db-init
