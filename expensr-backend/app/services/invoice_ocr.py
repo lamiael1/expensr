@@ -4,12 +4,11 @@ from datetime import date
 
 from google import genai
 from google.genai import types
-from google.genai.errors import APIError, ServerError
+from google.genai.errors import APIError
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
-# Configuración del cliente con timeout explícito de 20s y 1 solo intento
 client = genai.Client(
     http_options=types.HttpOptions(
         timeout=20_000,
@@ -17,8 +16,7 @@ client = genai.Client(
     )
 )
 
-# Lista de modelos con fallback
-MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash-lite"]
+MODELS_TO_TRY = ["gemini-3.5-flash-lite"]
 CATEGORIAS_VALIDAS = ["Dietas", "Transporte", "Material", "Formacion"]
 
 OCR_SYSTEM_PROMPT = (
@@ -56,7 +54,7 @@ class ExtractedInvoice(BaseModel):
 
 
 class InvoiceExtractionError(Exception):
-    """Fallo al extraer datos de la factura (API, parseo o validación)."""
+    """Fallo al extraer datos de la factura."""
 
 
 def extract_invoice_data(file_bytes: bytes, mime_type: str) -> ExtractedInvoice:
@@ -66,42 +64,38 @@ def extract_invoice_data(file_bytes: bytes, mime_type: str) -> ExtractedInvoice:
         response_schema=RESPONSE_SCHEMA,
     )
 
-    response = None
-    last_error = None
-
-    for model_name in MODELS_TO_TRY:
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=[
-                    types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-                    "Extrae los datos de este documento.",
-                ],
-                config=config,
-            )
-            if response and response.text:
-                break
-        except (APIError, ServerError) as exc:
-            logger.warning(
-                "Modelo %s falló (%s). Probando siguiente...", model_name, exc
-            )
-            last_error = exc
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.5-flash-lite",
+            contents=[
+                types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+                "Extrae los datos de este documento.",
+            ],
+            config=config,
+        )
+    except APIError as exc:
+        logger.exception("Falló la extracción con Gemini 3.5 Flash Lite")
+        raise InvoiceExtractionError(
+            f"Gemini no pudo procesar la factura: {exc}"
+        ) from exc
 
     if not response or not response.text:
         raise InvoiceExtractionError(
-            "El servicio de IA está experimentando alta latencia. Por favor, reintenta en unos segundos."
-        ) from last_error
-
-    raw_text = response.text
+            "Gemini no devolvió datos para esta factura."
+        )
 
     try:
-        data = json.loads(raw_text)
+        data = json.loads(response.text)
     except json.JSONDecodeError as exc:
-        logger.warning("JSON malformado del modelo: %s", raw_text)
-        raise InvoiceExtractionError("El modelo devolvió un formato inválido.") from exc
+        logger.warning("Gemini devolvió JSON malformado: %s", response.text)
+        raise InvoiceExtractionError(
+            "El modelo devolvió un formato inválido."
+        ) from exc
 
     try:
         return ExtractedInvoice.model_validate(data)
     except ValidationError as exc:
         logger.warning("Datos extraídos no válidos: %s", data)
-        raise InvoiceExtractionError("Los datos extraídos no son válidos.") from exc
+        raise InvoiceExtractionError(
+            "Los datos extraídos no son válidos."
+        ) from exc
