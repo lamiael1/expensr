@@ -20,6 +20,7 @@ class ExpenseResponse(BaseModel):
     categoria: str
     importe: float
     adjunto_url: str | None = None
+    baw_instance_id: str | None = None
 
     centro_coste: str | None = None
     requiere_revision_manager: bool

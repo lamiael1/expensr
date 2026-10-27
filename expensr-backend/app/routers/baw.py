@@ -38,6 +38,7 @@ def _get_expense_or_404(db: Session, gasto_id: int) -> ExpenseDB:
     return gasto
 
 
+@router.post("/expenses/{gasto_id}/validation")
 @router.patch("/expenses/{gasto_id}/validation")
 def update_baw_validation(
     gasto_id: int,
@@ -62,6 +63,7 @@ def update_baw_validation(
     return {"ok": True, "gasto_id": gasto.id, "estado": gasto.estado}
 
 
+@router.post("/expenses/{gasto_id}/decision")
 @router.patch("/expenses/{gasto_id}/decision")
 def update_baw_decision(
     gasto_id: int,

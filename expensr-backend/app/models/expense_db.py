@@ -17,7 +17,6 @@ class ExpenseDB(Base):
     categoria: Mapped[str] = mapped_column(String(100))
     importe: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     adjunto_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-
     # Campos gestionados por IBM BAW
     centro_coste: Mapped[str | None] = mapped_column(String(100), nullable=True)
     requiere_revision_manager: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -26,6 +25,7 @@ class ExpenseDB(Base):
     fecha_validacion_baw: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    baw_instance_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Campos gestionados por Appian
     acumulado_mes: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)

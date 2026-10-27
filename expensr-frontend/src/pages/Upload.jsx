@@ -36,8 +36,6 @@ function Upload() {
 
   const handleFileChange = (e) => {
     seleccionarArchivo(e.target.files?.[0]);
-
-    // Permite volver a seleccionar el mismo archivo.
     e.target.value = "";
   };
 
@@ -102,7 +100,7 @@ function Upload() {
     setExito("");
 
     try {
-      await createExpense({
+      const nuevoGasto = await createExpense({
         empleado: storedUser.empleado || "empleado_007",
         fecha: datos.fecha,
         concepto: datos.concepto.trim(),
@@ -111,9 +109,16 @@ function Upload() {
         adjunto_url: archivo?.name ?? null,
       });
 
-      setExito(
-        "Gasto registrado en Expensr como PENDIENTE_BAW. Todavía no se ha enviado a BAW.",
-      );
+      if (nuevoGasto.baw_instance_id) {
+        setExito(
+          `Gasto registrado e inicio confirmado en BAW. Instancia creada: #${nuevoGasto.baw_instance_id}`
+        );
+      } else {
+        setExito(
+          "Gasto registrado en Expensr como PENDIENTE_BAW (sin confirmación de instancia en BAW)."
+        );
+      }
+
       setArchivo(null);
       setDatos(null);
 
