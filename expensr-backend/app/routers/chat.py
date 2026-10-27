@@ -115,9 +115,7 @@ async def ask_chat(
                 function_name,
                 exc,
             )
-            function_result = {
-                "error": "Argumentos inválidos para la función."
-            }
+            function_result = {"error": "Argumentos inválidos para la función."}
 
     if candidate and candidate.content:
         contents.append(candidate.content)
@@ -139,9 +137,7 @@ async def ask_chat(
     try:
         second = _generate(contents, config)
     except APIError:
-        logger.exception(
-            "Error en la segunda llamada a Gemini 3.5 Flash Lite"
-        )
+        logger.exception("Error en la segunda llamada a Gemini 3.5 Flash Lite")
         return ChatResponse(
             response=(
                 "He consultado los datos pero no he podido redactar "

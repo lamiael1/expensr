@@ -80,22 +80,16 @@ def extract_invoice_data(file_bytes: bytes, mime_type: str) -> ExtractedInvoice:
         ) from exc
 
     if not response or not response.text:
-        raise InvoiceExtractionError(
-            "Gemini no devolvió datos para esta factura."
-        )
+        raise InvoiceExtractionError("Gemini no devolvió datos para esta factura.")
 
     try:
         data = json.loads(response.text)
     except json.JSONDecodeError as exc:
         logger.warning("Gemini devolvió JSON malformado: %s", response.text)
-        raise InvoiceExtractionError(
-            "El modelo devolvió un formato inválido."
-        ) from exc
+        raise InvoiceExtractionError("El modelo devolvió un formato inválido.") from exc
 
     try:
         return ExtractedInvoice.model_validate(data)
     except ValidationError as exc:
         logger.warning("Datos extraídos no válidos: %s", data)
-        raise InvoiceExtractionError(
-            "Los datos extraídos no son válidos."
-        ) from exc
+        raise InvoiceExtractionError("Los datos extraídos no son válidos.") from exc

@@ -84,10 +84,7 @@ def start_baw_instance(gasto: dict[str, Any]) -> str | None:
         if result.get("status") == "error" or result_data.get("status") == "error":
             raise RuntimeError(f"BAW devolvió un error: {response.text[:2000]}")
 
-        instance_id = (
-            result_data.get("piid")
-            or result_data.get("processInstanceId")
-        )
+        instance_id = result_data.get("piid") or result_data.get("processInstanceId")
         if not instance_id:
             raise RuntimeError(
                 f"BAW no devolvió el ID de instancia: {response.text[:2000]}"
