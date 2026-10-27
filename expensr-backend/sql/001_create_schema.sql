@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS gastos (
     decision_final VARCHAR(50),
     comentario_appian TEXT,
     fecha_decision_appian TIMESTAMPTZ,
+    baw_instance_id VARCHAR(100),
 
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.expense import ExpenseCreate, ExpenseResponse
 from app.models.expense_db import ExpenseDB
+from app.services.baw_service import start_baw_instance  # Importación del Paso 4
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
@@ -53,5 +54,26 @@ def create_expense(
     db.add(db_expense)
     db.commit()
     db.refresh(db_expense)
+
+    # 1. Preparar el diccionario con los datos del gasto
+    gasto_payload = {
+        "id": db_expense.id,
+        "empleado": db_expense.empleado,
+        "fecha": db_expense.fecha.isoformat(),
+        "concepto": db_expense.concepto,
+        "categoria": db_expense.categoria,
+        "importe": float(db_expense.importe),
+    }
+
+    # 2. Invocar a BAW e intentar guardar el ID de instancia recibido
+    try:
+        instance_id = start_baw_instance(gasto_payload)
+        if instance_id:
+            db_expense.baw_instance_id = instance_id
+            db.commit()
+            db.refresh(db_expense)
+    except Exception:
+        # Si falla la conexión con BAW, el gasto sigue guardado en PostgreSQL
+        pass
 
     return db_expense
