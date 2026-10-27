@@ -82,7 +82,9 @@ def extract_invoice_data(file_bytes: bytes, mime_type: str) -> ExtractedInvoice:
             if response and response.text:
                 break
         except (APIError, ServerError) as exc:
-            logger.warning("Modelo %s falló (%s). Probando siguiente...", model_name, exc)
+            logger.warning(
+                "Modelo %s falló (%s). Probando siguiente...", model_name, exc
+            )
             last_error = exc
 
     if not response or not response.text:

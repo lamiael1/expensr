@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +7,9 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.expense import ExpenseCreate, ExpenseResponse
 from app.models.expense_db import ExpenseDB
-from app.services.baw_service import start_baw_instance  # Importación del Paso 4
+from app.services.baw_service import start_baw_instance
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
@@ -72,8 +75,11 @@ def create_expense(
             db_expense.baw_instance_id = instance_id
             db.commit()
             db.refresh(db_expense)
-    except Exception:
-        # Si falla la conexión con BAW, el gasto sigue guardado en PostgreSQL
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "No se pudo iniciar el proceso en BAW para el gasto %s: %s",
+            db_expense.id,
+            exc,
+        )
 
     return db_expense

@@ -1,10 +1,13 @@
 import json
 import os
-from typing import Any, Optional # <--- Añadir esta importación
+from typing import Any  # <--- Añadir esta importación
 
 import httpx
 
-def start_baw_instance(gasto: dict[str, Any]) -> str | None:  # <--- Cambiar 'dict' por 'dict[str, Any]'
+
+def start_baw_instance(
+    gasto: dict[str, Any],
+) -> str | None:  # <--- Cambiar 'dict' por 'dict[str, Any]'
     """Inicia el proceso ExpenseValidation en IBM BAW y devuelve su piid."""
     base_url = os.getenv("BAW_BASE_URL", "").rstrip("/")
     user = os.getenv("BAW_USER", os.getenv("BAW_USERNAME", ""))
