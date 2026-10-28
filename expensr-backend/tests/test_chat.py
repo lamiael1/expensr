@@ -251,3 +251,33 @@ def test_chat_devuelve_mensaje_si_falla_segunda_llamada(
         ),
         "function_called": "funcion_inexistente",
     }
+
+
+def test_generate_usa_modelo_y_devuelve_respuesta(monkeypatch):
+    respuesta_esperada = SimpleNamespace(text="respuesta de prueba")
+    llamada = {}
+
+    def generate_content(*, model, contents, config):
+        llamada["model"] = model
+        llamada["contents"] = contents
+        llamada["config"] = config
+        return respuesta_esperada
+
+    monkeypatch.setattr(
+        chat.client.models,
+        "generate_content",
+        generate_content,
+    )
+
+    contents = ["contenido de prueba"]
+    config = object()
+
+    respuesta, modelo = chat._generate(contents, config)
+
+    assert respuesta is respuesta_esperada
+    assert modelo == chat.GEMINI_MODEL
+    assert llamada == {
+        "model": chat.GEMINI_MODEL,
+        "contents": contents,
+        "config": config,
+    }

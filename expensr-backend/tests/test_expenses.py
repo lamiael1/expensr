@@ -53,6 +53,33 @@ def test_crear_gasto_guarda_id_de_baw_si_lo_recibe(
     }
 
 
+def test_crear_gasto_se_guarda_si_baw_falla(client, monkeypatch, caplog):
+    payload = {
+        "empleado": "empleado_007",
+        "fecha": "2026-10-15",
+        "concepto": "Taxi al aeropuerto",
+        "categoria": "Transporte",
+        "importe": 32.5,
+    }
+
+    def fallar_baw(gasto):
+        raise RuntimeError("BAW temporalmente no disponible")
+
+    monkeypatch.setattr(
+        "app.routers.expenses.start_baw_instance",
+        fallar_baw,
+    )
+
+    response = client.post("/expenses/", json=payload)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["id"] is not None
+    assert body["estado"] == "PENDIENTE_BAW"
+    assert body["baw_instance_id"] is None
+    assert "BAW temporalmente no disponible" in caplog.text
+
+
 def test_listar_gastos_tras_crear(client, db_session):
     crear_gasto(db_session, concepto="Comida cliente")
     crear_gasto(db_session, concepto="Billete de tren")

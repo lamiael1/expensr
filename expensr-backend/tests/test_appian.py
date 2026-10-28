@@ -26,9 +26,7 @@ def crear_gasto(db_session, **cambios):
     return gasto
 
 
-def test_obtener_contexto_de_decision(client, db_session):
-    gasto = crear_gasto(db_session)
-
+def crear_tabla_presupuestos(db_session):
     db_session.execute(
         text(
             """
@@ -41,6 +39,12 @@ def test_obtener_contexto_de_decision(client, db_session):
             """
         )
     )
+
+
+def test_obtener_contexto_de_decision(client, db_session):
+    gasto = crear_gasto(db_session)
+    crear_tabla_presupuestos(db_session)
+
     db_session.execute(
         text(
             """
@@ -68,6 +72,20 @@ def test_obtener_contexto_de_decision(client, db_session):
     assert datos["limite_mensual"] == 500.0
     assert datos["acumulado_mes_aprobado"] == 0.0
     assert datos["presupuesto_restante_previo"] == 500.0
+
+
+def test_contexto_decision_sin_presupuesto_configurado(client, db_session):
+    gasto = crear_gasto(db_session)
+    crear_tabla_presupuestos(db_session)
+    db_session.commit()
+
+    response = client.get(f"/appian/expenses/{gasto.id}/decision-context")
+
+    assert response.status_code == 200
+    datos = response.json()
+    assert datos["limite_mensual"] is None
+    assert datos["presupuesto_restante_previo"] is None
+    assert datos["acumulado_mes_aprobado"] == 0.0
 
 
 def test_obtener_contexto_de_gasto_inexistente(client):
@@ -191,3 +209,21 @@ def test_guardar_decision_de_gasto_inexistente(client):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No existe el gasto #999."
+
+
+def test_contexto_decision_diciembre_calcula_inicio_de_enero(
+    client,
+    db_session,
+):
+    gasto = crear_gasto(
+        db_session,
+        fecha=date(2026, 12, 15),
+    )
+    crear_tabla_presupuestos(db_session)
+
+    response = client.get(f"/appian/expenses/{gasto.id}/decision-context")
+
+    assert response.status_code == 200
+    datos = response.json()
+    assert datos["fecha"] == "2026-12-15"
+    assert datos["acumulado_mes_aprobado"] == 0.0

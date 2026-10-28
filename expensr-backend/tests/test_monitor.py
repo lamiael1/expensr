@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+from app.routers import monitor
 from tests.factories import crear_gasto
 
 
@@ -58,13 +59,13 @@ def test_overview_en_curso_y_horas_en_etapa(client, db_session):
 def test_overview_tiempo_medio_sla_y_serie(client, db_session):
     creacion = datetime.now(UTC) - timedelta(days=3)
 
-    # Gasto resuelto en 10 h (cumple el SLA de 48 h): 4 h en BAW + 6 h en Appian
+    # Gasto resuelto en 10 h: 4 h en BAW y 6 h en Appian.
     rapido = crear_gasto(db_session, estado="APROBADO", decision_final="APROBADO")
     rapido.fecha_creacion = creacion
     rapido.fecha_validacion_baw = creacion + timedelta(hours=4)
     rapido.fecha_decision_appian = creacion + timedelta(hours=10)
 
-    # Gasto resuelto en 60 h (no cumple el SLA): 4 h en BAW + 56 h en Appian
+    # Gasto resuelto en 60 h: 4 h en BAW y 56 h en Appian.
     lento = crear_gasto(db_session, estado="APROBADO", decision_final="APROBADO")
     lento.fecha_creacion = creacion
     lento.fecha_validacion_baw = creacion + timedelta(hours=4)
@@ -82,3 +83,40 @@ def test_overview_tiempo_medio_sla_y_serie(client, db_session):
     serie = {s["dia"]: s for s in body["series_tiempos"]}
     assert serie[dia]["baw_horas"] == 4.0
     assert serie[dia]["appian_horas"] == 31.0
+
+
+def test_series_omite_gasto_si_fecha_creacion_no_se_puede_convertir(
+    db_session,
+    monkeypatch,
+):
+    crear_gasto(db_session)
+    monkeypatch.setattr(monitor, "_aware", lambda valor: None)
+
+    series = monitor._series_tiempos(db_session, datetime.now(UTC))
+
+    assert len(series) == 7
+    assert all(dia.baw_horas == 0.0 for dia in series)
+    assert all(dia.appian_horas == 0.0 for dia in series)
+
+
+def test_series_omite_gasto_fuera_de_los_siete_dias(db_session):
+    gasto = crear_gasto(db_session)
+    gasto.fecha_creacion = datetime.now(UTC) + timedelta(days=2)
+    db_session.commit()
+
+    series = monitor._series_tiempos(db_session, datetime.now(UTC))
+
+    assert len(series) == 7
+    assert all(dia.baw_horas == 0.0 for dia in series)
+    assert all(dia.appian_horas == 0.0 for dia in series)
+
+
+def test_overview_muestra_estado_desconocido_como_expensr(client, db_session):
+    crear_gasto(db_session, estado="EN_REVISION_INTERNA")
+
+    response = client.get("/monitor/overview")
+
+    assert response.status_code == 200
+    instancia = response.json()["instancias"][0]
+    assert instancia["sistema"] == "Expensr"
+    assert instancia["etapa_actual"] == "En revision interna"

@@ -187,3 +187,38 @@ def test_fetch_all_devuelve_fuentes_no_configuradas():
     assert [r.sistema for r in resultados] == ["BAW", "Appian"]
     assert all(r.configurado is False for r in resultados)
     assert all(r.ok is False for r in resultados)
+
+
+def test_ssl_legacy_avisa_si_python_no_tiene_verify_x509_strict(
+    monkeypatch,
+    tmp_path,
+    caplog,
+):
+    import logging
+    import ssl
+    from types import SimpleNamespace
+
+    from app.services import process_sources
+
+    ca_bundle = tmp_path / "ca.pem"
+    ca_bundle.write_text("certificado de prueba")
+
+    contexto_falso = SimpleNamespace(verify_flags=0)
+
+    monkeypatch.setenv("BAW_CA_BUNDLE", str(ca_bundle))
+    monkeypatch.setenv("BAW_ALLOW_LEGACY_CERTS", "true")
+    monkeypatch.delattr(ssl, "VERIFY_X509_STRICT", raising=False)
+    monkeypatch.setattr(
+        ssl,
+        "create_default_context",
+        lambda cafile: contexto_falso,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        contexto = process_sources._baw_ssl_context()
+
+    assert contexto is contexto_falso
+    assert (
+        "BAW: esta versión de Python no permite modificar VERIFY_X509_STRICT."
+        in caplog.text
+    )
