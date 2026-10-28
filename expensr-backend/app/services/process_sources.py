@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 TIMEOUT_SEGUNDOS = 10.0
 
 BAW_INSTANCES_PATH = "/rest/bpm/wle/v1/processes/search"
-APPIAN_INSTANCES_PATH = "/suite/webapi/expensr/listActiveInstances"
+APPIAN_INSTANCES_PATH = "/suite/webapi/expensrActiveInstances"
 
 
 class ProcessInstance(BaseModel):
@@ -94,20 +94,41 @@ def _parse_baw(data: Any) -> list[ProcessInstance]:
 
 
 def _parse_appian(data: Any) -> list[ProcessInstance]:
-    """Convierte la respuesta de instancias de Appian."""
+    """Convierte las filas c0-c6 del informe de procesos de Appian."""
     if not isinstance(data, list):
         raise TypeError("Formato inesperado en la respuesta de Appian")
 
-    return [
-        ProcessInstance(
-            id=str(item["id"]),
-            sistema="Appian",
-            etapa_actual=str(item["etapa_actual"]),
-            horas_en_etapa=item.get("horas_en_etapa"),
-            prioridad=item.get("prioridad", "Normal"),
+    instancias = []
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+
+        # c6 es pp!id: el identificador de la instancia de Appian.
+        identificador = item.get("id")
+        if identificador is None:
+            identificador = item.get("c6")
+
+        if identificador is None:
+            continue
+
+        # El informe está filtrado por procesos activos.
+        etapa = item.get("etapa_actual")
+        if etapa is None or etapa == "":
+            etapa = "Activo"
+
+        instancias.append(
+            ProcessInstance(
+                id=str(identificador),
+                sistema="Appian",
+                etapa_actual=str(etapa),
+                # c2 es la hora de inicio del proceso, no el inicio de la etapa.
+                horas_en_etapa=item.get("horas_en_etapa"),
+                prioridad=str(item.get("prioridad") or "Normal"),
+            )
         )
-        for item in data
-    ]
+
+    return instancias
 
 
 async def _fetch_baw(client: httpx.AsyncClient) -> SourceResult:
