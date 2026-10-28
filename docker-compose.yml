@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:17
     container_name: expensr-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en el archivo .env}
       POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en el archivo .env}
@@ -10,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./expensr-backend/sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test:
         [
@@ -24,6 +26,7 @@ services:
     build:
       context: ./expensr-backend
     container_name: expensr-backend
+    restart: unless-stopped
     env_file:
       - ./expensr-backend/.env
     environment:
@@ -40,12 +43,26 @@ services:
       args:
         VITE_API_URL: /api
     container_name: expensr-frontend
+    restart: unless-stopped
     environment:
       BACKEND_HOST: backend
     ports:
       - "8081:80"
     depends_on:
       - backend
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: expensr-ngrok
+    restart: unless-stopped
+    command:
+      - http
+      - frontend:80
+      - --url=https://tameness-hamburger-proton.ngrok-free.dev
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:?Define NGROK_AUTHTOKEN en el .env de la raíz}
+    depends_on:
+      - frontend
 
 volumes:
   postgres_data:
