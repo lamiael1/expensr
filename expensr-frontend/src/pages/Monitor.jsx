@@ -87,7 +87,12 @@ function Monitor() {
     Appian: punto.appian_horas,
   }));
 
-  const instancias = (overview?.instancias ?? []).slice(0, 5);
+  const instancias = [
+    ...(overview?.instancias ?? []),
+    ...(overview?.instancias_externas ?? []),
+  ]
+    .sort((a, b) => String(b.id).localeCompare(String(a.id), undefined, { numeric: true }))
+      .slice(0, 5);
 
   return (
     <main className="space-y-6">
