@@ -1,84 +1,86 @@
-# Decisiones técnicas — Expensr
+# Decisiones técnicas de Expensr
 
-Este documento registra las decisiones técnicas, el estado de las integraciones y las limitaciones conocidas del proyecto.
 
-## Frontend y backend
+Este documento explica las elecciones y adaptaciones técnicas de Expensr. 
 
-- El frontend es una SPA construida con React y Vite. React Router gestiona las vistas de subida de facturas, histórico de gastos, chatbot y monitoreo.
-- FastAPI es el intermediario entre la interfaz, PostgreSQL, BAW, Appian y Gemini.
-- El frontend no almacena ni recibe credenciales de BAW, Appian o Gemini.
-- Nginx sirve el frontend y reenvía las peticiones de la interfaz bajo `/api/` al backend. También publica las rutas HTTP que necesitan las integraciones de BAW.
+## 1. Arquitectura
 
-## Base de datos
+Expensr consta de una SPA React + Vite, backend FastAPI, PostgreSQL, procesos IBM BAW y Appian, IA generativa y despliegue local en Docker/Kubernetes. FastAPI sirve al frontend y hace de intermediario con los sistemas externos. El navegador no debe recibir credenciales de BAW, Appian, Gemini o ngrok.
 
-Se utiliza PostgreSQL. El esquema y los datos de ejemplo están versionados en `expensr-backend/sql/`.
+Flujo previsto:
 
-La tabla `gastos` contiene los datos de la factura, los campos de validación de BAW, la decisión de Appian y las fechas de trazabilidad. La tabla `presupuestos` guarda el límite mensual por empleado y categoría.
+1. El empleado aporta una factura; el backend extrae sus datos y el empleado los revisa.
+2. FastAPI crea el gasto en PostgreSQL e intenta iniciar el proceso de validación BAW.
+3. BAW aplica reglas operativas y permite la revisión humana.
+4. Appian calcula y presenta la decisión financiera.
+5. Appian devuelve la decisión al endpoint de Expensr y el monitor consulta ambas plataformas mediante FastAPI.
 
-FastAPI administra las escrituras en la base de datos. BAW y Appian se comunican con FastAPI por HTTP, y el backend persiste sus cambios.
+El callback Appian → Expensr se probó: HTTP 200, gasto actualizado a aprobado y mostrado como finalizado. BAW estaba en mantenimiento en la última revisión, por lo que el flujo completo debe volver a probarse cuando se restablezca.
 
-## Integración con IBM BAW
+## 2. Tecnologías elegidas
 
-FastAPI inicia el proceso `ExpenseValidation` mediante la Process REST API de BAW. El identificador de instancia se guarda en el gasto y se devuelve al frontend.
+| Área | Decisión | Razón |
+|---|---|---|
+| Interfaz | React + Vite | SPA por componentes, navegación y compilación estática servida por Nginx. |
+| API | FastAPI + Pydantic | Tipado, validación de entrada/salida y documentación OpenAPI. |
+| Persistencia | PostgreSQL + SQLAlchemy | Base relacional persistente para gastos y presupuestos. |
+| Integración HTTP | HTTPX | Cliente HTTP para BAW/Appian; permite consultar fuentes de monitor en paralelo. |
+| OCR/chat | Gemini gemini-3.5-flash-lite | Un proveedor cubre visión y function calling. La respuesta OCR se valida antes de usarse. |
+| Exposición local | ngrok con dominio reservado | URL estable para callbacks externos y arranque mediante Compose. |
+| Contenedores | Docker Compose | Arranque conjunto de frontend, backend, PostgreSQL y ngrok. |
+| Orquestación local | Kubernetes integrado de Docker Desktop | Cluster disponible en el equipo para practicar namespace, Pods, Deployments, Services, PVC y kubectl. |
 
-BAW aplica las reglas de validación y comunica el centro de coste, la necesidad de revisión y el resultado al backend mediante HTTP. FastAPI actualiza PostgreSQL.
+## 3. Excepciones acordadas con los tutores
 
-### Decisión de no usar JDBC desde BAW
+### 3.1 Sin JDBC directo desde BAW/Appian
 
-El enunciado propone una integración SQL/JDBC desde BAW. Tras consultarlo, los tutores confirmaron que el proyecto puede resolverse sin JDBC. Por eso, BAW no se conecta directamente a PostgreSQL: invoca los endpoints HTTP de FastAPI, que centraliza las escrituras en la base de datos.
+**Decisión:** no configurar datasource JDBC de BAW ni conexión directa Appian–PostgreSQL.
 
-Esta decisión reduce la configuración de infraestructura y mantiene una única capa responsable de persistir los cambios. La contrapartida es que BAW depende de que el backend esté disponible para actualizar el gasto.
+**Motivo:** los tutores autorizaron omitir JDBC si se explica la decisión. Configurar conectividad JDBC requiere coordinación del servidor y no es necesaria para demostrar el flujo de integración por APIs.
 
-## Integración con Appian
+**Alternativa implementada:** PostgreSQL es gestionado por FastAPI. Appian obtiene el contexto de decisión por HTTP y devuelve el resultado con POST /api/appian/expenses/{gasto_id}/decision. BAW se integra con el backend y Appian por REST.
 
-El proceso financiero de Appian obtiene el contexto del gasto desde Expensr y envía la decisión final al backend mediante HTTP. FastAPI guarda la decisión, el comentario y las fechas correspondientes en PostgreSQL.
+**Consecuencia:** la base de datos no es accedida directamente por los tres motores; FastAPI media y es responsable de mantener consistencia. Esta arquitectura difiere del objetivo didáctico de demostrar un Data Store compartido y debe explicarse en la presentación.
 
-La decisión del gasto #19 se probó: el backend respondió `200 OK`, el gasto pasó a `APROBADO` y el monitor lo mostró como finalizado.
+### 3.2 Login simulado
 
-El informe de procesos activos y el Web API de Appian para el monitor están configurados. El backend tiene el adaptador para consumir el endpoint `expensrActiveInstances`; la consulta en vivo desde Expensr requiere `APPIAN_BASE_URL` y `APPIAN_API_KEY` en el `.env` local.
+**Decisión:** usar una identidad de demostración configurable, en vez de implementar autenticación real.
 
-## Login simulado
+**Motivo:** los tutores autorizaron simular el login.
 
-El login actual identifica al empleado de demostración en el frontend. Los tutores confirmaron que se permite simular el login para este proyecto.
+**Implementación y guardarraíl:** DEMO_EMPLOYEE define la identidad usada por las funciones del chatbot (por defecto, empleado_007). El backend pasa esa identidad a las funciones; el modelo no puede cambiarla mediante argumentos.
 
-No es un mecanismo de autenticación de producción: el backend no valida una identidad real ni tokens de sesión. Las funciones del chatbot filtran por el empleado configurado por la aplicación, pero esto no sustituye la autenticación real.
+**Consecuencia:** no hay autenticación, sesión real ni aislamiento multiusuario suficiente para producción. Esta configuración solo sirve para el prototipo formativo.
 
-## Inteligencia artificial
+## 4. Adaptaciones adicionales
 
-Se utiliza Gemini mediante el SDK `google-genai` para OCR de facturas y chatbot.
+### 4.1 Gemini como proveedor de IA
 
-El OCR procesa imágenes o PDF, solicita datos estructurados y valida la respuesta antes de devolverla al frontend. El chatbot usa function calling con funciones limitadas para consultar gastos, estados y tiempos; no permite generar SQL libre.
+El enunciado cita Claude u OpenAI como proveedores. Se eligió Gemini para usar visión/OCR y function calling en la misma integración. La clave se obtiene del entorno; Pydantic valida datos extraídos y los fallos del proveedor/formato se manejan con errores controlados.
 
-La clave de Gemini se configura en el `.env` y no se incluye en el repositorio.
+Es una sustitución del proveedor sugerido. Se registra para que el tutor valore la equivalencia funcional; no debe presentarse como Claude/OpenAI.
 
-## Monitoreo
+### 4.2 Kubernetes de Docker Desktop
 
-La pantalla de monitoreo presenta KPIs, tiempos por etapa, instancias recientes y actualización periódica. El backend consulta las fuentes externas y agrega sus resultados con los datos de PostgreSQL.
+Se usa el cluster local docker-desktop en vez de Minikube o Kind porque ya está disponible y permite desplegar los servicios requeridos. El frontend se expone mediante kubectl port-forward. No hay Ingress, que es opcional en el enunciado. La elección se justifica por el objetivo de familiarización con Kubernetes, no por una arquitectura de producción.
 
-BAW se ha observado como fuente configurada y operativa. Appian dispone de un Web API y de un parser en el backend; la verificación de la consulta en vivo queda pendiente de configurar la API key.
+### 4.3 ngrok integrado en Compose
 
-## ngrok
+ngrok se ejecuta como servicio con reinicio automático y dominio estático. El túnel apunta al Nginx del frontend, que enruta /api a FastAPI. Esto permite callbacks externos sin iniciar ngrok manualmente. El token y dominio se configuran localmente; no se escriben en este documento.
 
-ngrok expone el entorno local a BAW y Appian mediante el dominio estático reservado. En Docker Compose expone nginx, que sirve el frontend y reenvía las rutas correspondientes al backend.
+### 4.4 Monitor tolerante a fallos
 
-El dominio y las claves se configuran fuera del código. El túnel debe permanecer activo mientras los sistemas externos necesiten llamar a Expensr.
+GET /api/monitor/overview consulta BAW y Appian en paralelo y devuelve la disponibilidad/error de cada fuente. Si una no responde, la aplicación conserva los datos de la otra y puede mostrar el aviso. Las pruebas automatizadas simulan las fuentes externas; hace falta una prueba real cuando estén disponibles.
 
-## Docker Compose y Kubernetes
+### 4.5 PostgreSQL y contrato de datos
 
-Docker Compose levanta frontend nginx, backend FastAPI y PostgreSQL. PostgreSQL utiliza un volumen persistente.
+Se usa PostgreSQL en vez de SQLite por persistencia y por el carácter relacional de la solución. El backend gestiona el acceso de aplicación. Las decisiones y transiciones de BAW/Appian regresan por HTTP al backend debido a la excepción de JDBC. El esquema SQL debe permanecer versionado y la documentación debe indicar qué componente actualiza cada campo.
 
-El despliegue Kubernetes local se comprobó en Docker Desktop: frontend, backend y PostgreSQL quedaron en estado `Running`, el PVC quedó `Bound` y la API respondió mediante `port-forward`.
+## 5. Seguridad y operación
 
-El enunciado menciona Minikube o Kind. Se ha comunicado a los tutores que se utilizó Docker Desktop; la aceptación de esta diferencia depende de su confirmación.
-
-## Pruebas y calidad
-
-El backend dispone de pruebas automatizadas y comprobaciones Ruff ejecutadas mediante `just check`. Se han registrado 31 pruebas superadas.
-
-El flujo BAW se ha probado creando instancias y completando tareas. La decisión Appian del gasto #19 se persistió y se reflejó en Expensr. La consulta de instancias Appian desde el monitor requiere la API key.
-
-## Entorno y secretos
-
-Los archivos `.env` se excluyen del repositorio. Las claves, contraseñas y credenciales se configuran localmente o mediante Secrets de Kubernetes.
-
-No se deben incluir secretos en commits, capturas ni mensajes.
+- No versionar .env, API keys, contraseñas ni tokens.
+- No incluir credenciales en React, el bundle web, capturas o logs públicos.
+- Rotar cualquier secreto que se haya expuesto en una conversación, consola compartida o historial Git.
+- BAW_ALLOW_LEGACY_CERTS permite compatibilidad con el certificado legacy del entorno de formación. Mantenerlo limitado al entorno requerido.
+- El login simulado y el uso de un túnel público no constituyen controles de producción.
+- No ejecutar docker compose down -v si se desea conservar los datos de PostgreSQL.
