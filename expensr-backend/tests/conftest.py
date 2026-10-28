@@ -25,22 +25,27 @@ def sin_credenciales_externas(monkeypatch):
 
 @pytest.fixture()
 def db_session():
-    """Base de datos SQLite en memoria, aislada por test."""
+    """Base SQLite en memoria, aislada por test y cerrada al terminar."""
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    testing_session_local = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+    )
 
     Base.metadata.create_all(bind=engine)
+    session = testing_session_local()
 
-    session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+        engine.dispose()
 
 
 @pytest.fixture()
@@ -54,6 +59,8 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = _get_db_override
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
