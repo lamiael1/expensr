@@ -26,7 +26,7 @@ async def extract_invoice(file: Annotated[UploadFile, File()]):
 
     if len(file_bytes) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="El archivo supera el tamaño máximo de 10 MB.",
         )
 
