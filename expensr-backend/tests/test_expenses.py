@@ -1,3 +1,5 @@
+import pytest
+
 from tests.factories import crear_gasto
 
 
@@ -8,7 +10,12 @@ def test_get_expenses_vacio(client):
     assert response.json() == []
 
 
-def test_crear_gasto(client):
+@pytest.mark.parametrize("instance_id", ["2546", None])
+def test_crear_gasto_guarda_id_de_baw_si_lo_recibe(
+    client,
+    monkeypatch,
+    instance_id,
+):
     payload = {
         "empleado": "empleado_007",
         "fecha": "2026-10-15",
@@ -16,6 +23,16 @@ def test_crear_gasto(client):
         "categoria": "Transporte",
         "importe": 32.5,
     }
+    gasto_enviado_a_baw = {}
+
+    def iniciar_baw(gasto):
+        gasto_enviado_a_baw.update(gasto)
+        return instance_id
+
+    monkeypatch.setattr(
+        "app.routers.expenses.start_baw_instance",
+        iniciar_baw,
+    )
 
     response = client.post("/expenses/", json=payload)
 
@@ -25,7 +42,15 @@ def test_crear_gasto(client):
     assert body["concepto"] == "Taxi al aeropuerto"
     assert body["importe"] == 32.5
     assert body["estado"] == "PENDIENTE_BAW"
-    assert body["id"] is not None
+    assert body["baw_instance_id"] == instance_id
+    assert gasto_enviado_a_baw == {
+        "id": body["id"],
+        "empleado": "empleado_007",
+        "fecha": "2026-10-15",
+        "concepto": "Taxi al aeropuerto",
+        "categoria": "Transporte",
+        "importe": 32.5,
+    }
 
 
 def test_listar_gastos_tras_crear(client, db_session):
