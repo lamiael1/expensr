@@ -14,6 +14,7 @@ def ejecutar_fetch(fetch, handler):
 
     return asyncio.run(ejecutar())
 
+
 def test_parse_baw_procesa_respuesta_anidada_y_omite_filas_invalidas():
     datos = {
         "data": {
@@ -33,6 +34,7 @@ def test_parse_baw_procesa_respuesta_anidada_y_omite_filas_invalidas():
         ("101", "Active"),
         ("103", "En curso"),
     ]
+
 
 def test_parse_baw_acepta_lista_plana():
     resultado = ps._parse_baw([{"id": 55, "state": "Running"}])
