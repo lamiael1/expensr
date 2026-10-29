@@ -40,6 +40,34 @@ function KpiCard({ label, value, detail, color }) {
   );
 }
 
+function DegradationBanner({ fuentes, avisos }) {
+  const fallidas = (fuentes ?? []).filter((f) => f.configurado && !f.ok);
+
+  if (fallidas.length === 0) return null;
+
+  return (
+    <div
+      role="alert"
+      className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800"
+    >
+      <p className="font-semibold">
+        Datos parciales: {fallidas.map((f) => f.sistema).join(" y ")} no{" "}
+        {fallidas.length === 1 ? "responde" : "responden"} ahora mismo.
+      </p>
+      <p className="mt-1">
+        La vista sigue mostrando los datos disponibles del resto de sistemas.
+      </p>
+      {avisos && avisos.length > 0 && (
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {avisos.map((aviso, i) => (
+            <li key={i}>{aviso}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Monitor() {
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,12 +115,7 @@ function Monitor() {
     Appian: punto.appian_horas,
   }));
 
-  const instancias = [
-    ...(overview?.instancias ?? []),
-    ...(overview?.instancias_externas ?? []),
-  ]
-    .sort((a, b) => String(b.id).localeCompare(String(a.id), undefined, { numeric: true }))
-      .slice(0, 5);
+  const instancias = (overview?.instancias ?? []).slice(0, 5);
 
   return (
     <main className="space-y-6">
@@ -123,6 +146,10 @@ function Monitor() {
         >
           {error}
         </div>
+      )}
+
+      {overview && (
+        <DegradationBanner fuentes={overview.fuentes} avisos={overview.avisos} />
       )}
 
       {loading && !overview && (
