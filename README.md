@@ -1,130 +1,96 @@
-# Expensr
+# 💳 Expensr - Sistema de Gestión e Integración de Gastos Empresariales
 
-Aplicación web para registrar y consultar gastos empresariales. Integra React + Vite, FastAPI, PostgreSQL, IBM BAW, Appian, IA generativa y despliegue local con Docker y Kubernetes.
+**Expensr** es una plataforma integral para el registro, validación, evaluación financiera y monitoreo de gastos corporativos. Integra interfaces modernas en React, un orquestador central en FastAPI, automatización de procesos con **IBM Business Automation Workflow (BAW)** y **Appian**, lectura inteligente de facturas vía **OCR**, asistencia mediante un **Chatbot con Function Calling** y despliegues contenerizados en **Docker** y **Kubernetes**.
 
-## Funcionalidades
+---
 
-- Subida de facturas: el backend envía imágenes o PDF a Gemini para extraer fecha, importe, categoría y concepto. El empleado revisa los datos antes de registrar el gasto.
-- Mis gastos: consulta del histórico de gastos.
-- Chatbot: respuestas en español con function calling para listar gastos, consultar estados y calcular tiempos medios. Las funciones reciben la identidad de demostración desde el backend.
-- Monitoreo: KPIs, gráfico por etapa y tabla de instancias. FastAPI consulta BAW y el Web API de Appian, unifica resultados y presenta avisos si una fuente falla.
-- Aprobación: FastAPI registra el gasto e intenta iniciar BAW. Appian toma la decisión financiera y la devuelve a Expensr mediante una API.
+## 🚀 Arquitectura General
 
-## Arquitectura
+* **Frontend:** React + Vite, Tailwind CSS, Recharts.
+* **Backend:** Python (FastAPI, SQLAlchemy 2.0, Pydantic v2, Uvicorn).
+* **Base de Datos:** PostgreSQL 16.
+* **Motores BPM:** IBM BAW v11.3 & Appian.
+* **Inteligencia Artificial:** Servicio OCR de facturas y Chatbot interactivo (OpenAI / Function Calling).
+* **Despliegue:** Docker Compose y manifiestos de Kubernetes (`k8s/`).
 
-    Navegador → React/Vite servido por Nginx → /api → FastAPI → PostgreSQL
-                                                        ├→ IBM BAW (REST)
-                                                        ├→ Appian (Web APIs)
-                                                        └→ Gemini (OCR y chatbot)
+---
 
-ngrok publica Nginx, que enruta las solicitudes /api hacia FastAPI. Las credenciales permanecen en el entorno del backend/despliegue, nunca en el bundle del frontend.
+## 📁 Estructura del Repositorio
 
-## Requisitos
+```text
+ProyectoExpensr/
+├── expensr-backend/      # Servidor FastAPI, routers, modelos y tests con pytest
+├── expensr-frontend/     # Aplicación React + Vite + Tailwind CSS
+├── exports/              # Exportaciones de los procesos BPM
+│   ├── appian/          # Paquete de aplicación de Appian (.zip)
+│   └── baw/             # Process App / Toolkit de IBM BAW (.twx)
+├── docs/                 # Diagramas de arquitectura y decisiones de diseño
+├── k8s/                  # Manifiestos de Kubernetes (PostgreSQL, Backend, Frontend)
+└── docker-compose.yml    # Orquestación de contenedores locales
+```
 
-- Docker Desktop y Docker Compose.
-- Para Kubernetes: Docker Desktop con Kubernetes habilitado y kubectl.
-- Para desarrollo fuera de contenedores: uv, just, Node.js y pnpm.
-- Credenciales externas para probar BAW, Appian, Gemini y ngrok.
+---
 
-## Arranque con Docker Compose
+## 🛠️ Requisitos Previos
 
-1. Clona el repositorio y entra en la carpeta raíz.
-2. Crea un archivo .env local a partir de .env.example si está disponible.
-3. Completa las variables requeridas; no subas .env ni credenciales al repositorio.
-4. Arranca los servicios:
+* Docker y Docker Compose
+* Python >= 3.11 y `uv` (administrador de entornos y paquetes)
+* Node.js y `pnpm`
+* Cuenta/Túnel de **ngrok** configurado
 
-    docker compose up -d --build
-    docker compose ps
+---
 
-La interfaz local se sirve en http://localhost:8081. Ejemplos de comprobación por el proxy:
+## 💻 Ejecución con Docker Compose
 
-    curl -sS http://localhost:8081/api/expenses/
-    curl -sS http://localhost:8081/api/monitor/overview
+1. **Configurar variables de entorno:**
+   Copia los archivos de ejemplo `.env.example` a `.env` tanto en la raíz como en `expensr-backend/` e introduce tus credenciales y dominios de ngrok.
 
-Para consultar logs:
+2. **Iniciar los servicios:**
+   ```bash
+   docker compose up -d --build
+   ```
 
-    docker compose logs -f backend
-    docker compose logs -f ngrok
+3. **Acceso a las aplicaciones:**
+   * **Frontend Web:** [http://localhost:5173](http://localhost:5173) (o puerto mapeado en Nginx).
+   * **Documentación API (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-Para detener los servicios y conservar los datos de PostgreSQL:
+---
 
-    docker compose down
+## ☸️ Despliegue en Kubernetes Local (Kind / Minikube)
 
-No uses docker compose down -v salvo que quieras borrar el volumen y los datos persistidos.
+Para desplegar la aplicación completa en Kubernetes:
 
-## Variables de entorno
+1. **Crear el Namespace y ConfigMaps:**
+   ```bash
+   kubectl apply -f k8s/namespace.yaml
+   kubectl apply -f k8s/db-init-configmap.yaml
+   ```
 
-Los nombres deben coincidir con docker-compose.yml y con la configuración efectiva del backend. Variables utilizadas por el proyecto:
+2. **Desplegar la Base de Datos:**
+   ```bash
+   kubectl apply -f k8s/postgres.yaml
+   ```
 
-| Variable | Uso |
-|---|---|
-| DATABASE_URL | URL SQLAlchemy de PostgreSQL. En Compose, el host es el nombre del servicio de base de datos. |
-| APPIAN_BASE_URL | URL base de Appian. |
-| APPIAN_API_KEY | Clave que envía FastAPI al Web API de Appian. |
-| BAW_BASE_URL | URL base del servidor BAW. |
-| BAW_USER, BAW_PASSWORD | Credenciales de BAW para el backend. |
-| BAW_BPD_ID, BAW_PROCESS_APP_ID | Identificadores de proceso y aplicación BAW. |
-| BAW_CA_BUNDLE | Ruta al certificado CA si el servidor requiere un certificado específico. |
-| BAW_ALLOW_LEGACY_CERTS | Compatibilidad temporal con el certificado legacy del entorno formativo. |
-| GEMINI_API_KEY | Clave para OCR y chatbot. |
-| DEMO_EMPLOYEE | Identidad simulada del empleado; por defecto, empleado_007. |
-| NGROK_AUTHTOKEN, DOMAIN | Token y dominio estático si los referencia Compose. |
+3. **Desplegar Backend y Frontend:**
+   ```bash
+   kubectl apply -f k8s/backend.yaml
+   kubectl apply -f k8s/frontend.yaml
+   ```
 
-Usa valores locales. Si una clave real se expone en terminales, capturas, mensajes o historial Git, revócala y crea otra.
+4. **Verificar estado de los pods:**
+   ```bash
+   kubectl get pods -n expensr
+   ```
 
-## Rutas principales
+---
 
-Swagger describe los schemas y rutas disponibles. Las rutas principales, vistas a través del prefijo /api del proxy, son:
+## 🧪 Pruebas y Calidad de Código
 
-| Método | Ruta | Función |
-|---|---|---|
-| GET | /api/expenses/ | Lista gastos. |
-| GET | /api/expenses/{gasto_id} | Devuelve un gasto. |
-| POST | /api/expenses/ | Crea un gasto e intenta iniciar BAW. |
-| POST | /api/extract-invoice | Extrae datos de una imagen o PDF. |
-| POST | /api/chat/ | Chat con function calling. |
-| GET | /api/monitor/overview | KPIs, series y estados unificados. |
-| GET | /api/appian/expenses/{gasto_id}/decision-context | Contexto de decisión para Appian. |
-| POST | /api/appian/expenses/{gasto_id}/decision | Guarda en Expensr la decisión Appian. |
+Para ejecutar las comprobaciones de formato, linters y suite de pruebas unitarias/integración en el backend:
 
-El Web API de Appian usado en el monitor está configurado con la ruta /suite/webapi/expensrActiveInstances. 
-
-## Pruebas y calidad
-
-Desde expensr-backend:
-
-    just check
-    just test-cov
-
-
-Desde expensr-frontend:
-
-    pnpm lint
-    pnpm build
-
-
-## Kubernetes local
-
-El despliegue reportado usa el Kubernetes integrado de Docker Desktop, namespace expensr. Backend y frontend estaban 1/1, PostgreSQL 1/1 y el PVC enlazado. No hay Ingress; el acceso es mediante port-forward:
-
-    kubectl config current-context
-    kubectl get pods,deploy,statefulset,services,pvc -n expensr
-    kubectl port-forward -n expensr service/expensr-frontend 8082:80
-
-Con el port-forward activo, abre http://localhost:8082. ngrok se ejecuta desde Docker Compose fuera del cluster.
-
-Los manifiestos están en k8s/ según el estado reportado. Revisa sus nombres y variables reales antes de aplicar en otro entorno. No guardes secretos reales en manifiestos versionados.
-
-## Estructura del repositorio
-
-    expensr-backend/      FastAPI, modelos, routers, servicios y tests
-    expensr-frontend/     React + Vite
-    k8s/                  Manifiestos Kubernetes
-    docs/decisiones.md    Decisiones y excepciones autorizadas
-    docker-compose.yml
-
-
-## Limitaciones y cierre
-
-- El login de empleado está simulado y no proporciona seguridad de producción.
-- BAW/Appian no acceden directamente a PostgreSQL por JDBC; FastAPI intermedia,  documentada en docs/decisiones.md.
+```bash
+cd expensr-backend
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest -v
+```
