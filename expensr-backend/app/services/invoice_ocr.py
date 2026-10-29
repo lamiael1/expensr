@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import date
 
+import httpx
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
@@ -11,12 +12,11 @@ logger = logging.getLogger(__name__)
 
 client = genai.Client(
     http_options=types.HttpOptions(
-        timeout=20_000,
+        timeout=60_000,
         retry_options=types.HttpRetryOptions(attempts=1),
     )
 )
 
-MODELS_TO_TRY = ["gemini-3.5-flash-lite"]
 CATEGORIAS_VALIDAS = ["Dietas", "Transporte", "Material", "Formacion"]
 
 OCR_SYSTEM_PROMPT = (
@@ -73,7 +73,7 @@ def extract_invoice_data(file_bytes: bytes, mime_type: str) -> ExtractedInvoice:
             ],
             config=config,
         )
-    except APIError as exc:
+    except (APIError, httpx.TimeoutException) as exc:
         logger.exception("Falló la extracción con Gemini 3.5 Flash Lite")
         raise InvoiceExtractionError(
             f"Gemini no pudo procesar la factura: {exc}"

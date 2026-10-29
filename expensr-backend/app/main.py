@@ -11,6 +11,7 @@ app = FastAPI(
     title="Expensr API",
     description="API de backend para la gestión de gastos empresarial",
     version="0.1.0",
+    root_path="/api",
 )
 app.openapi_version = "3.0.2"
 
