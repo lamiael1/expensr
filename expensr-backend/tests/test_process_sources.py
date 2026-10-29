@@ -41,10 +41,9 @@ def test_appian_ok_devuelve_instancias(monkeypatch):
             200,
             json=[
                 {
-                    "id": "G-2411",
-                    "etapa_actual": "Decisión",
-                    "horas_en_etapa": 28.0,
-                    "prioridad": "Alta",
+                    "c3": "2411",
+                    "c4": "",
+                    "c2": "2026-10-28T10:00:00Z",
                 }
             ],
         )
@@ -52,9 +51,9 @@ def test_appian_ok_devuelve_instancias(monkeypatch):
     resultado = asyncio.run(_llamar(ps._fetch_appian, handler))
 
     assert resultado.ok is True
-    assert resultado.instancias[0].id == "G-2411"
+    assert resultado.instancias[0].id == "2411"
     assert resultado.instancias[0].sistema == "Appian"
-    assert resultado.instancias[0].horas_en_etapa == 28.0
+    assert resultado.instancias[0].etapa_actual == "Pendiente de decisión Finanzas"
 
 
 def test_baw_error_http_no_lanza_excepcion(monkeypatch):

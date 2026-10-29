@@ -217,6 +217,8 @@ async def get_monitor_overview(
         ):
             sistema = "Finalizado"
             etapa = "Proceso finalizado"
+            fin = expense.fecha_decision_appian or expense.fecha_validacion_baw
+            horas_en_etapa = _horas(expense.fecha_creacion, fin)
         else:
             sistema = "Expensr"
             etapa = estado.replace("_", " ").capitalize()

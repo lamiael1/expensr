@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import ssl
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,18 @@ TIMEOUT_SEGUNDOS = 10.0
 
 BAW_INSTANCES_PATH = "/rest/bpm/wle/v1/processes/search"
 APPIAN_INSTANCES_PATH = "/suite/webapi/expensrActiveInstances"
+
+# Estados de BAW que indican que la instancia ya no está "viva".
+# El enunciado (Sección 8) pide una tabla de instancias VIVAS, así que
+# estas se excluyen en vez de mezclarlas con las activas.
+ESTADOS_FINALIZADOS_BAW = {
+    "terminated",
+    "completed",
+    "failed",
+    "cancelled",
+    "canceled",
+    "deleted",
+}
 
 
 class ProcessInstance(BaseModel):
@@ -53,7 +66,12 @@ def _no_disponible(sistema: str) -> SourceResult:
 
 
 def _parse_baw(data: Any) -> list[ProcessInstance]:
-    """Convierte la respuesta de búsqueda de instancias de BAW."""
+    """Convierte la respuesta de búsqueda de instancias de BAW.
+
+    Solo se devuelven las instancias que siguen vivas: se excluyen las
+    que ya están Terminated/Completed/Failed/etc, porque la tabla de
+    monitoreo debe mostrar procesos en curso, no históricos.
+    """
     if isinstance(data, dict):
         contenido = data.get("data", {})
         if not isinstance(contenido, dict):
@@ -80,6 +98,9 @@ def _parse_baw(data: Any) -> list[ProcessInstance]:
 
         estado = item.get("executionState") or item.get("state") or "En curso"
 
+        if str(estado).strip().lower() in ESTADOS_FINALIZADOS_BAW:
+            continue
+
         instancias.append(
             ProcessInstance(
                 id=str(identificador),
@@ -93,38 +114,90 @@ def _parse_baw(data: Any) -> list[ProcessInstance]:
     return instancias
 
 
+def _parse_appian_start_time(valor: Any) -> datetime | None:
+    """Intenta interpretar la columna 'Start Time' (c2) del informe Appian.
+
+    Appian puede devolver la fecha en distintos formatos según el formato
+    de columna configurado. Se prueban los más comunes; si ninguno
+    encaja, se devuelve None y la duración queda sin calcular (degradación
+    controlada, no rompe la vista).
+    """
+    if valor is None:
+        return None
+
+    if isinstance(valor, (int, float)):
+        # Epoch en milisegundos, formato habitual de Appian para fechas.
+        try:
+            return datetime.fromtimestamp(valor / 1000, tz=UTC)
+        except (ValueError, OverflowError, OSError):
+            return None
+
+    if isinstance(valor, str):
+        texto = valor.strip()
+        if not texto:
+            return None
+        try:
+            texto_iso = texto.replace("Z", "+00:00")
+            fecha = datetime.fromisoformat(texto_iso)
+            if fecha.tzinfo is None:
+                fecha = fecha.replace(tzinfo=UTC)
+            return fecha
+        except ValueError:
+            return None
+
+    return None
+
+
 def _parse_appian(data: Any) -> list[ProcessInstance]:
-    """Convierte las filas c0-c6 del informe de procesos de Appian."""
+    """Convierte las filas c0-c6 del informe de procesos de Appian.
+
+    Columnas del informe EL_Expensr_ProcesosActivos:
+    c0=Name, c1=Status, c2=Start Time, c3=gasto_id,
+    c4=decision_final, c5=presupuesto_restante, c6=process_id.
+    """
     if not isinstance(data, list):
         raise TypeError("Formato inesperado en la respuesta de Appian")
 
+    ahora = datetime.now(UTC)
     instancias = []
 
     for item in data:
         if not isinstance(item, dict):
             continue
 
-        # c6 es pp!id: el identificador de la instancia de Appian.
-        identificador = item.get("id")
-        if identificador is None:
-            identificador = item.get("c6")
-
+        # c3 es pv!gasto_id: el mismo ID que el resto de la app usa
+        # para referirse al gasto (coherente con "Mis gastos").
+        gasto_id = item.get("c3")
+        identificador = gasto_id if gasto_id is not None else item.get("c6")
         if identificador is None:
             continue
 
-        # El informe está filtrado por procesos activos.
-        etapa = item.get("etapa_actual")
-        if etapa is None or etapa == "":
-            etapa = "Activo"
+        # c4 es pv!decision_final: no hay columna de "etapa" real en el
+        # informe, así que se deriva el estado visible a partir de si
+        # ya hay decisión de Finanzas o no.
+        decision_final = item.get("c4")
+        if decision_final:
+            etapa = f"Decidido en Appian: {decision_final}"
+        else:
+            etapa = "Pendiente de decisión Finanzas"
+
+        # c2 es pp!starttime: se usa para calcular cuánto lleva la
+        # instancia activa, igual que se hace con las instancias
+        # internas de BAW.
+        inicio = _parse_appian_start_time(item.get("c2"))
+        horas_en_etapa = (
+            round((ahora - inicio).total_seconds() / 3600, 1)
+            if inicio is not None
+            else None
+        )
 
         instancias.append(
             ProcessInstance(
                 id=str(identificador),
                 sistema="Appian",
-                etapa_actual=str(etapa),
-                # c2 es la hora de inicio del proceso, no el inicio de la etapa.
-                horas_en_etapa=item.get("horas_en_etapa"),
-                prioridad=str(item.get("prioridad") or "Normal"),
+                etapa_actual=etapa,
+                horas_en_etapa=horas_en_etapa,
+                prioridad="Normal",
             )
         )
 

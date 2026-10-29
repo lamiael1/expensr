@@ -14,7 +14,6 @@ def ejecutar_fetch(fetch, handler):
 
     return asyncio.run(ejecutar())
 
-
 def test_parse_baw_procesa_respuesta_anidada_y_omite_filas_invalidas():
     datos = {
         "data": {
@@ -32,10 +31,8 @@ def test_parse_baw_procesa_respuesta_anidada_y_omite_filas_invalidas():
 
     assert [(i.id, i.etapa_actual) for i in resultado] == [
         ("101", "Active"),
-        ("102", "Completed"),
         ("103", "En curso"),
     ]
-
 
 def test_parse_baw_acepta_lista_plana():
     resultado = ps._parse_baw([{"id": 55, "state": "Running"}])
@@ -59,26 +56,24 @@ def test_parse_baw_rechaza_respuestas_con_formato_invalido(datos):
         ps._parse_baw(datos)
 
 
-def test_parse_appian_usa_c6_y_valores_predeterminados():
+def test_parse_appian_usa_gasto_id_y_decision_final():
     datos = [
-        {"c6": 8700, "c4": "", "c5": None},
-        {
-            "id": "APP-2",
-            "etapa_actual": "Decisión financiera",
-            "prioridad": "Alta",
-            "horas_en_etapa": 3.5,
-        },
+        {"c3": "2410", "c4": "Aprobar", "c2": "2026-10-28T08:00:00Z"},
+        {"c3": "2412", "c4": "", "c2": None},
+        {"c6": 8700, "c4": None, "c2": None},
         {},
         "fila incorrecta",
     ]
 
     resultado = ps._parse_appian(datos)
 
-    assert [(i.id, i.etapa_actual, i.prioridad) for i in resultado] == [
-        ("8700", "Activo", "Normal"),
-        ("APP-2", "Decisión financiera", "Alta"),
+    assert [(i.id, i.etapa_actual) for i in resultado] == [
+        ("2410", "Decidido en Appian: Aprobar"),
+        ("2412", "Pendiente de decisión Finanzas"),
+        ("8700", "Pendiente de decisión Finanzas"),
     ]
-    assert resultado[1].horas_en_etapa == 3.5
+    assert resultado[0].horas_en_etapa is not None
+    assert resultado[1].horas_en_etapa is None
 
 
 def test_parse_appian_rechaza_respuesta_que_no_es_lista():
