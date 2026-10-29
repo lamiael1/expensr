@@ -1,76 +1,129 @@
 # Expensr - Sistema de Gestión e Integración de Gastos Empresariales
 
-Expensr es una aplicación web para la gestión, validación, evaluación financiera y monitoreo de gastos corporativos. El sistema orquesta procesos entre una interfaz web moderna, un backend en Python, motores de BPM (IBM BAW y Appian), servicios de Inteligencia Artificial para OCR y chatbot, y una base de datos relacional PostgreSQL.
+Expensr es una plataforma web end-to-end diseñada para el registro, validación operativa, evaluación financiera y monitoreo de gastos corporativos. El sistema orquesta flujos de trabajo entre una interfaz Single Page Application (SPA), un servidor API en Python, motores de procesos de negocio (IBM BAW y Appian), servicios de Inteligencia Artificial (OCR para facturas y chatbot interactivo) y una base de datos relacional PostgreSQL.
 
-## Arquitectura General
+---
 
-- Frontend: React 18, Vite, Tailwind CSS, Recharts.
-- Backend: Python (FastAPI, SQLAlchemy 2.0, Pydantic v2, Uvicorn).
-- Base de Datos: PostgreSQL 16.
-- Motores BPM: IBM Business Automation Workflow (BAW) y Appian.
-- Inteligencia Artificial: OCR para extracción de datos de facturas y Chatbot interactivo con Function Calling.
-- Despliegue: Docker, Docker Compose y manifiestos de Kubernetes en k8s/.
+## Arquitectura y Tecnologías
 
-## Estructura del Repositorio
+El sistema se compone de varios módulos integrados mediante arquitecturas REST y comunicación asíncrona:
 
-expensr-backend/      Servidor FastAPI, routers, modelos y suite de tests con pytest
-expensr-frontend/     Aplicación cliente React con Vite y Nginx
-exports/              Exportaciones de los procesos BPM (BAW .twx y Appian .zip)
-docs/                 Documentación de arquitectura, base de datos y decisiones de diseño
-k8s/                  Manifiestos de Kubernetes para PostgreSQL, backend y frontend
-docker-compose.yml    Configuración de contenedores para desarrollo y despliegue local
+| Módulo | Tecnologías | Descripción |
+| :--- | :--- | :--- |
+| **Frontend** | React 18, Vite, Tailwind CSS, Recharts | Interfaz web con navegación mediante React Router y refresco dinámico de datos. |
+| **Backend** | Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic v2 | API REST central que orquesta la persistencia y la comunicación con servicios externos. |
+| **Base de Datos** | PostgreSQL 16 | Persistencia relacional de gastos, presupuestos y trazabilidad de tiempos por etapa. |
+| **BPM - Validación** | IBM Business Automation Workflow (BAW) | Flujo BPMN para autoinformado de centros de coste y tarea humana de revisión operativa. |
+| **BPM - Decisión** | Appian | Evaluación de acumulados mensuales, reglas de negocio e interfaz SAIL de decisión final. |
+| **Inteligencia Artificial** | OpenAI / Claude LLM | Servicio OCR de extracción estructurada de tickets y Chatbot con Function Calling. |
+| **Contenerización** | Docker, Docker Compose, Nginx, Kubernetes | Empaquetado multietapa y manifiestos de despliegue local (k8s). |
+
+---
+
+## Estructura del Proyecto
+
+```text
+ProyectoExpensr/
+├── expensr-backend/      Servidor FastAPI, routers, modelos Pydantic, servicios y tests
+├── expensr-frontend/     Aplicación cliente React compilada con Vite y servida con Nginx
+├── exports/              Exportables de los procesos BPM (BAW .twx y Appian .zip)
+├── docs/                 Documentación técnica, arquitectura, base de datos y decisiones
+├── k8s/                  Manifiestos de Kubernetes (PostgreSQL, Backend, Frontend)
+└── docker-compose.yml    Configuración de orquestación de contenedores en desarrollo
+```
+
+---
 
 ## Despliegue con Docker Compose
 
-1. Configuración de variables de entorno:
-   Asegúrate de tener los archivos .env configurados en la raíz y en expensr-backend/ según los archivos .env.example.
+El proyecto está configurado para ejecutarse en contenedores mediante Docker Compose con redes internas y volúmenes persistentes.
 
-2. Iniciar el entorno:
-   Ejecuta el siguiente comando para construir y levantar los contenedores:
+### 1. Variables de entorno
 
-   docker compose up -d --build
+Copia y configura los archivos de entorno en la raíz y en el directorio del backend:
 
-3. Puertos y accesos:
-   - Frontend Web (Nginx): http://localhost:8081
-   - Pestaña de Monitoreo: http://localhost:8081/monitor
-   - Backend API / Documentación Swagger: http://localhost:8000/docs
-   - Base de Datos PostgreSQL: localhost:5432 (Base de datos: expensr_db, Usuario: expensr_user)
+```bash
+cp expensr-backend/.env.example expensr-backend/.env
+```
+
+### 2. Construcción e inicio
+
+Ejecuta el siguiente comando para construir las imágenes e iniciar los servicios en segundo plano:
+
+```bash
+docker compose up -d --build
+```
+
+### 3. Puntos de acceso
+
+Una vez iniciados los contenedores, los servicios están disponibles en los siguientes puertos:
+
+| Servicio | URL / Puerto | Descripción |
+| :--- | :--- | :--- |
+| **Frontend Web** | `http://localhost:8081` | Aplicación web servida con Nginx |
+| **Pestaña Monitoreo** | `http://localhost:8081/monitor` | Vista unificada de métricas y procesos |
+| **Documentación API** | `http://localhost:8000/docs` | Swagger UI interactivo de FastAPI |
+| **PostgreSQL** | `localhost:5432` | Base de datos (`expensr_db` / `expensr_user`) |
+
+---
 
 ## Desarrollo Local (Sin Docker)
 
-Si prefieres ejecutar el frontend y backend de forma independiente durante el desarrollo:
+Para ejecutar el entorno de desarrollo local paso a paso:
 
-1. Backend:
-   cd expensr-backend
-   uv run uvicorn app.main:app --reload --port 8000
+### Backend (FastAPI)
 
-2. Frontend:
-   cd expensr-frontend
-   pnpm install
-   pnpm dev
-   Acceso en desarrollo: http://localhost:5173
+```bash
+cd expensr-backend
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+### Frontend (React + Vite)
+
+```bash
+cd expensr-frontend
+pnpm install
+pnpm dev
+```
+
+Acceso al cliente de desarrollo: `http://localhost:5173`
+
+---
 
 ## Despliegue en Kubernetes Local (Minikube / Kind)
 
-Para desplegar la aplicación en un cluster local de Kubernetes usando los manifiestos incluidos:
+Los manifiestos en el directorio `k8s/` permiten desplegar la arquitectura completa en un cluster local de Kubernetes.
 
-1. Aplicar el namespace y configuraciones:
+1. **Crear el namespace y configuraciones de la base de datos:**
+
+   ```bash
    kubectl apply -f k8s/namespace.yaml
    kubectl apply -f k8s/db-init-configmap.yaml
+   ```
 
-2. Desplegar servicios:
+2. **Desplegar la base de datos y los microservicios:**
+
+   ```bash
    kubectl apply -f k8s/postgres.yaml
    kubectl apply -f k8s/backend.yaml
    kubectl apply -f k8s/frontend.yaml
+   ```
 
-3. Verificar los pods:
+3. **Verificar el estado de las cargas de trabajo:**
+
+   ```bash
    kubectl get pods -n expensr
+   ```
 
-## Pruebas y Calidad de Código
+---
 
-Para verificar el formato, linters y pasar los tests del backend:
+## Calidad de Código y Pruebas
 
+Para verificar el cumplimiento de reglas de estilo, formato y pasar la suite de pruebas unitarias e integración en el backend:
+
+```bash
 cd expensr-backend
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest -v
+```
