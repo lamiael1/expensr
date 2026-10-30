@@ -115,8 +115,7 @@ function Monitor() {
     Appian: punto.appian_horas,
   }));
 
-  const instancias = (overview?.instancias ?? []).slice(0, 5);
-
+  const instancias = (overview?.instancias_externas ?? []).slice(0, 5);
   return (
     <main className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
