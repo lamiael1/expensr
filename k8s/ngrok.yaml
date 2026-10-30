@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expensr-ngrok
+  namespace: expensr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: expensr-ngrok
+  template:
+    metadata:
+      labels:
+        app: expensr-ngrok
+    spec:
+      containers:
+        - name: ngrok
+          image: ngrok/ngrok:latest
+          args:
+            - http
+            - expensr-frontend:80
+            - --url=https://tameness-hamburger-proton.ngrok-free.dev
+          env:
+            - name: NGROK_AUTHTOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ngrok-auth
+                  key: authtoken
