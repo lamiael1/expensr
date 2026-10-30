@@ -1,73 +1,60 @@
-# Base de datos — contrato de integración
+# Base de datos
 
-La base de datos PostgreSQL es el estado compartido entre tres sistemas:
-el backend Python (FastAPI), IBM BAW y Appian. Cada sistema solo escribe
-las columnas que le corresponden; el resto las lee.
+Expensr guarda sus gastos y presupuestos en PostgreSQL. FastAPI es el componente que lee y escribe estas tablas. BAW y Appian se integran con el backend por API; no acceden directamente a la base de datos por JDBC ni mediante un Data Store de Appian.
 
-El esquema está versionado en `expensr-backend/sql/001_create_schema.sql`
-y los datos de ejemplo en `expensr-backend/sql/002_seed.sql`.
+El esquema se define en `expensr-backend/sql/001_create_schema.sql`. Los datos iniciales se encuentran en `expensr-backend/sql/002_seed.sql`; Kubernetes tiene una copia de inicialización en `k8s/db-init-configmap.yaml`.
 
 ## Tabla `gastos`
 
-### Escritas por el backend Python (al subir el gasto)
+| Columna | Tipo | Uso |
+| --- | --- | --- |
+| `id` | `BIGSERIAL` | Identificador del gasto |
+| `empleado` | `VARCHAR(100)` | Empleado asociado al gasto |
+| `fecha` | `DATE` | Fecha del gasto |
+| `concepto` | `VARCHAR(255)` | Descripción breve |
+| `categoria` | `VARCHAR(100)` | Categoría del gasto |
+| `importe` | `NUMERIC(10,2)` | Importe, no negativo |
+| `adjunto_url` | `TEXT` | Nombre o URL del justificante |
+| `centro_coste` | `VARCHAR(100)` | Centro de coste informado durante la validación |
+| `requiere_revision_manager` | `BOOLEAN` | Indica si requiere revisión de manager |
+| `estado` | `VARCHAR(50)` | Estado actual del flujo |
+| `comentario_baw` | `TEXT` | Comentario de revisión BAW |
+| `fecha_validacion_baw` | `TIMESTAMPTZ` | Fecha de validación BAW |
+| `baw_instance_id` | `VARCHAR(100)` | Identificador de instancia de BAW |
+| `acumulado_mes` | `NUMERIC(10,2)` | Acumulado mensual usado en la decisión financiera |
+| `presupuesto_restante` | `NUMERIC(10,2)` | Presupuesto restante calculado para la decisión |
+| `decision_final` | `VARCHAR(50)` | Decisión financiera final |
+| `comentario_appian` | `TEXT` | Comentario asociado a la decisión financiera |
+| `fecha_decision_appian` | `TIMESTAMPTZ` | Fecha de la decisión financiera |
+| `fecha_creacion` | `TIMESTAMPTZ` | Fecha de creación del registro |
 
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | BIGSERIAL | Clave primaria |
-| `empleado` | VARCHAR(100) | Empleado autenticado |
-| `fecha` | DATE | Fecha del gasto |
-| `concepto` | VARCHAR(255) | Descripción breve |
-| `categoria` | VARCHAR(100) | Dietas, Transporte, Material, Formacion |
-| `importe` | NUMERIC(10,2) | Mayor o igual que 0 |
-| `adjunto_url` | TEXT | Nombre o URL de la factura adjunta |
-| `estado` | VARCHAR(50) | El backend lo inicia en `PENDIENTE_BAW` |
-| `fecha_creacion` | TIMESTAMPTZ | Primer timestamp del flujo |
+Al crear un gasto, el backend lo guarda inicialmente con estado `PENDIENTE_BAW`. El backend intenta iniciar la instancia de BAW y guarda su identificador cuando recibe uno.
 
-### Escritas por IBM BAW (vía `PATCH /baw/expenses/{id}/...`)
+BAW actualiza los campos de validación y estado a través de los endpoints del backend `/baw/expenses/{gasto_id}/validation` y `/baw/expenses/{gasto_id}/decision`.
 
-| Columna | Tipo | Notas |
-|---|---|---|
-| `centro_coste` | VARCHAR(100) | Autoinformado por regla de negocio (Dietas → `CC-COMERCIAL-01`) |
-| `requiere_revision_manager` | BOOLEAN | Autoinformado (Dietas con importe mayor que 30 €) |
-| `estado` | VARCHAR(50) | BAW lo actualiza al validar y al decidir |
-| `comentario_baw` | TEXT | Comentario del revisor humano |
-| `fecha_validacion_baw` | TIMESTAMPTZ | Segundo timestamp del flujo |
-
-BAW no escribe directamente en la base de datos por JDBC: llama a los
-endpoints `/baw/expenses/{id}/validation` y `/baw/expenses/{id}/decision`
-del backend (ver `docs/decisiones.md`).
-
-### Escritas por Appian (al cerrar el proceso)
-
-| Columna | Tipo | Notas |
-|---|---|---|
-| `acumulado_mes` | NUMERIC(10,2) | Suma de gastos aprobados del empleado en la categoría durante el mes |
-| `presupuesto_restante` | NUMERIC(10,2) | Límite mensual menos `acumulado_mes` |
-| `decision_final` | VARCHAR(50) | Aprobar, Aprobar con ajuste o Rechazar |
-| `comentario_appian` | TEXT | Comentario de Finanzas |
-| `fecha_decision_appian` | TIMESTAMPTZ | Tercer timestamp del flujo |
+Appian obtiene los datos de decisión mediante `/appian/expenses/{gasto_id}/decision-context` y guarda el resultado mediante `/appian/expenses/{gasto_id}/decision`. El backend actualiza los campos financieros y el estado final.
 
 ## Tabla `presupuestos`
 
-Límite mensual por empleado y categoría. Solo se lee (Appian y el
-chatbot); se carga con los datos semilla.
+| Columna | Tipo | Uso |
+| --- | --- | --- |
+| `id` | `BIGSERIAL` | Identificador del presupuesto |
+| `empleado` | `VARCHAR(100)` | Empleado al que se aplica |
+| `categoria` | `VARCHAR(100)` | Categoría del presupuesto |
+| `limite_mensual` | `NUMERIC(10,2)` | Límite mensual, no negativo |
 
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | BIGSERIAL | Clave primaria |
-| `empleado` | VARCHAR(100) | |
-| `categoria` | VARCHAR(100) | |
-| `limite_mensual` | NUMERIC(10,2) | Mayor o igual que 0 |
+La combinación de empleado y categoría es única. Los datos iniciales incluyen presupuestos de Dietas, Transporte, Material y Formación para el empleado de demostración.
 
-Restricción: un único presupuesto por (`empleado`, `categoria`).
+## Cálculo de tiempos
 
-## Tiempos por etapa
+Los campos de fecha permiten calcular las duraciones del flujo:
 
-Los tres timestamps permiten calcular la duración de cada etapa:
+- Tiempo total en BAW: `fecha_validacion_baw - fecha_creacion`.
+- Tiempo en Appian: `fecha_decision_appian - fecha_validacion_baw`.
+- Tiempo total hasta la decisión: `fecha_decision_appian - fecha_creacion`.
 
-- Tiempo en BAW = `fecha_validacion_baw - fecha_creacion`
-- Tiempo en Appian = `fecha_decision_appian - fecha_validacion_baw`
-- Tiempo total = `fecha_decision_appian - fecha_creacion`
+El monitor usa esos datos para las métricas y la serie temporal. El chatbot también calcula el tiempo medio de resolución para el empleado configurado.
 
-La pestaña de monitoreo y la función `tiempo_medio_aprobacion` del
-chatbot se apoyan en ellos.
+## Persistencia por entorno
+
+Docker Compose guarda PostgreSQL en el volumen `postgres_data`. Kubernetes utiliza un PersistentVolumeClaim asociado al StatefulSet `expensr-postgres`. Son bases independientes y no sincronizan cambios automáticamente.

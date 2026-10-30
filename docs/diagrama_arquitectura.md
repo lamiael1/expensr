@@ -1,44 +1,41 @@
-# Arquitectura del Sistema - Expensr
+# Arquitectura de Expensr
 
-El sistema **Expensr** integra aplicaciones web, orquestación de procesos de negocio (BPM), inteligencia artificial y persistencia relacional en un entorno de microservicios contenerizados.
+Expensr se ejecuta mediante Docker Compose o Kubernetes. En ambos casos, el frontend se comunica con FastAPI y el backend guarda los datos en PostgreSQL. BAW y Appian se integran con el backend mediante API.
 
-## Diagrama de Componentes y Flujo de Datos
+```mermaid
+flowchart LR
+    U[Usuario] --> F[Frontend React y Nginx]
+    F -->|API HTTP| B[Backend FastAPI]
+    B -->|SQLAlchemy| DB[(PostgreSQL del entorno)]
 
-```
-+-----------------------------------------------------------------------------------+
-|                                    Navegador                                      |
-|                            [ React + Vite + Tailwind ]                            |
-+-----------------------------------------------------------------------------------+
-                                    |        ^
-                       REST / HTTP  |        |  Respuesta UI
-                                    v        |
-+-----------------------------------------------------------------------------------+
-|                                 Backend FastAPI                                   |
-|                                                                                   |
-|  +--------------------+  +--------------------+  +-----------------------------+  |
-|  | /expenses /ocr     |  | /chat (LLM)        |  | /monitor                    |  |
-|  | Routers Principales|  | Function Calling   |  | Métricas & SLA              |  |
-|  +--------------------+  +--------------------+  +-----------------------------+  |
-+-----------------------------------------------------------------------------------+
-       |              |                |                     |
-       | SQLAlchemy   | HTTP / REST    | REST                | REST (Consultas)
-       v              v                v                     v
-+------------+  +--------------+  +---------------+  +------------------------------+
-| PostgreSQL |  |  Servicio    |  |    IBM BAW    |  |         Appian BPM           |
-| (Database) |  | OCR / OpenAI |  | (Validación)  |  |  (Decisión & Reglas Nomb.)   |
-+------------+  +--------------+  +---------------+  +------------------------------+
-       ^                                 |                           |
-       |            Callback Webhook     |     Callback Webhook      |
-       +---------------------------------+---------------------------+
-                        (A través de túnel HTTP ngrok)
+    B -->|Inicia procesos y consulta instancias| W[IBM BAW]
+    B -->|Consulta instancias| A[Appian]
+
+    W -->|Consulta gastos y envía validaciones| N[Ngrok del entorno activo]
+    A -->|Consulta contexto y envía decisión| N
+    N -->|Túnel público| F
+
+    B -->|Gemini API| G[Google Gemini]
 ```
 
-## Flujo End-to-End del Proceso de Gasto
+## Flujo de un gasto
 
-1. **Captura y OCR:** El usuario sube una factura/ticket desde el Frontend. El backend procesa la imagen a través del servicio OCR extrayendo datos estructurados (empleado, concepto, importe, fecha).
-2. **Registro Inicial:** El gasto se almacena en PostgreSQL con estado `PENDIENTE_BAW`.
-3. **Validación en IBM BAW:** El backend invoca la REST API de IBM BAW para iniciar la instancia del proceso de validación humana/administrativa.
-4. **Webhook BAW:** Al finalizar la revisión en BAW, este notifica al backend vía webhook (exposición con ngrok en desarrollo local), actualizando el estado a `PENDIENTE_APPIAN` o `RECHAZADO_BAW`.
-5. **Decisión Financiera en Appian:** Si BAW aprueba el gasto, el backend inicia el proceso en Appian para evaluar las reglas financieras e importe.
-6. **Webhook Appian:** Appian procesa la decisión final y notifica al backend, actualizando el estado final (`APROBADO` / `RECHAZADO`).
-7. **Monitoreo & Chatbot:** La pestaña de monitoreo consulta en tiempo real métricas y series temporales consolidadas de PostgreSQL, BAW y Appian. El chatbot permite consultar o crear gastos mediante la ejecución de funciones (*Function Calling*).
+1. El usuario sube una factura o introduce los datos del gasto.
+2. Si sube un archivo, el backend solicita a Gemini la extracción de fecha, importe, categoría y concepto. El usuario revisa los datos antes de registrar el gasto.
+3. El backend guarda el gasto en PostgreSQL con estado inicial `PENDIENTE_BAW` e intenta iniciar el proceso correspondiente en BAW.
+4. BAW consulta el gasto y comunica al backend los datos de validación y el resultado de su revisión.
+5. La integración con Appian permite obtener los datos financieros, registrar la decisión y guardar el estado final en Expensr.
+6. El monitor lee PostgreSQL y consulta las fuentes externas. Si una fuente no responde, puede mostrar los datos disponibles junto con un aviso.
+
+## Acceso desde los motores BPM
+
+BAW y Appian están alojados fuera del clúster local. Ngrok crea un túnel público hacia el frontend del entorno elegido; Nginx reenvía las rutas de API al backend.
+
+- En Docker Compose, el servicio ngrok definido en `docker-compose.yml` apunta al servicio `frontend` de Compose.
+- En Kubernetes, `k8s/ngrok.yaml` apunta al Service `expensr-frontend`.
+
+Compose y Kubernetes tienen bases de datos distintas. Para que una llamada BPM lea y actualice los datos del entorno esperado, el dominio público de ngrok debe dirigir el tráfico a ese entorno.
+
+## Persistencia
+
+El backend es el único componente que accede directamente a PostgreSQL. BAW y Appian usan la API de Expensr; no tienen conexión JDBC ni un Data Store de Appian conectado a esta base.
