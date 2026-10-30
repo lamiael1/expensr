@@ -35,12 +35,21 @@ spec:
                 secretKeyRef:
                   name: expensr-db-connection
                   key: DATABASE_URL
+          volumeMounts:
+            - name: baw-ca
+              mountPath: /run/certs/baw-ca.pem
+              subPath: baw-ca.pem
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
+      volumes:
+        - name: baw-ca
+          configMap:
+            name: baw-ca
 ---
 apiVersion: v1
 kind: Service
