@@ -210,7 +210,6 @@ async def get_monitor_overview(
             continue
 
         fecha_fin_aware = _aware(fecha_fin)
-        fecha_creacion_aware = _aware(gasto.fecha_creacion)
 
         if fecha_fin_aware is not None and fecha_fin_aware.date() == ahora.date():
             completados_hoy += 1
@@ -219,9 +218,7 @@ async def get_monitor_overview(
         if duracion_total is not None:
             duraciones_finales.append(duracion_total)
 
-    tiempo_medio_horas = (
-        _media(duraciones_finales) if duraciones_finales else None
-    )
+    tiempo_medio_horas = _media(duraciones_finales) if duraciones_finales else None
     sla_pct = (
         round(
             100
@@ -284,19 +281,13 @@ async def get_monitor_overview(
                 importe=float(expense.importe),
                 sistema=sistema,
                 etapa_actual=etapa,
-                prioridad=(
-                    "Alta" if expense.requiere_revision_manager else "Normal"
-                ),
+                prioridad="Alta" if expense.requiere_revision_manager else "Normal",
                 estado=estado,
                 fecha_creacion=(
-                    expense.fecha_creacion.isoformat()
-                    if expense.fecha_creacion
-                    else ""
+                    expense.fecha_creacion.isoformat() if expense.fecha_creacion else ""
                 ),
                 horas_en_etapa=(
-                    round(horas_en_etapa, 1)
-                    if horas_en_etapa is not None
-                    else None
+                    round(horas_en_etapa, 1) if horas_en_etapa is not None else None
                 ),
             )
         )
@@ -323,11 +314,7 @@ async def get_monitor_overview(
             )
             for fuente in fuentes
         ],
-        avisos=[
-            fuente.error
-            for fuente in fuentes
-            if not fuente.ok and fuente.error
-        ],
+        avisos=[fuente.error for fuente in fuentes if not fuente.ok and fuente.error],
         instancias_externas=[
             instancia
             for fuente in fuentes
