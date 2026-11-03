@@ -1,6 +1,8 @@
 import logging
 import os
+from datetime import datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends
 from google import genai
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 DEMO_EMPLOYEE = os.getenv("DEMO_EMPLOYEE", "empleado_007")
 GEMINI_MODEL = "gemini-3.5-flash-lite"
+ZONA_HORARIA = ZoneInfo("Europe/Madrid")
 
 client = genai.Client(
     http_options=types.HttpOptions(
@@ -26,13 +29,22 @@ client = genai.Client(
     )
 )
 
-SYSTEM_PROMPT = (
-    "Eres el asistente de Expensr, una app de gestión de gastos. "
-    "Responde siempre en español, de forma breve y concreta. "
-    "Usa las funciones disponibles para consultar datos reales del empleado; "
-    "nunca inventes importes, estados ni fechas. "
-    "Si una función indica que no hay datos, dilo con naturalidad."
-)
+
+def _crear_system_prompt() -> str:
+    fecha_actual = datetime.now(ZONA_HORARIA).date().isoformat()
+
+    return (
+        "Eres el asistente de Expensr, una app de gestión de gastos. "
+        "Responde siempre en español, de forma breve y concreta. "
+        f"La fecha actual es {fecha_actual}, en la zona horaria Europe/Madrid. "
+        "Interpreta expresiones relativas como 'este mes' y 'este año' "
+        "usando esa fecha, no una fecha supuesta. "
+        "Al consultar gastos de un mes, usa el mes y el año correspondientes "
+        "a la fecha actual, salvo que el usuario indique otro año. "
+        "Usa las funciones disponibles para consultar datos reales del empleado; "
+        "nunca inventes importes, estados ni fechas. "
+        "Si una función indica que no hay datos, dilo con naturalidad."
+    )
 
 
 class ChatRequest(BaseModel):
@@ -67,7 +79,7 @@ async def ask_chat(
     ]
 
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=_crear_system_prompt(),
         tools=GEMINI_TOOLS,
     )
 

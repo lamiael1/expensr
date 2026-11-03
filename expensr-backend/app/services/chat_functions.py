@@ -1,10 +1,19 @@
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from google.genai import types
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.expense_db import ExpenseDB
+
+ZONA_HORARIA = ZoneInfo("Europe/Madrid")
+
+DESCRIPCION_MES = "Mes del año (1-12). Si se indica sin año, se usa el año actual."
+DESCRIPCION_ANIO = (
+    "Año de los gastos. Si se indica un mes y se omite el año, se usa el año actual."
+)
 
 FUNCTION_SCHEMAS = [
     {
@@ -13,18 +22,26 @@ FUNCTION_SCHEMAS = [
             "name": "listar_gastos",
             "description": (
                 "Lista los gastos del empleado autenticado, opcionalmente "
-                "filtrados por mes (1-12) y/o categoría."
+                "filtrados por mes, año y/o categoría. Para 'este mes', "
+                "usa el mes y año actuales indicados en las instrucciones."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "mes": {
                         "type": "integer",
-                        "description": "Mes del año (1-12). Si se omite, no filtra por mes.",
+                        "description": DESCRIPCION_MES,
+                    },
+                    "anio": {
+                        "type": "integer",
+                        "description": DESCRIPCION_ANIO,
                     },
                     "categoria": {
                         "type": "string",
-                        "description": "Categoría del gasto (ej. Dietas, Transporte, Material, Formacion).",
+                        "description": (
+                            "Categoría del gasto (ej. Dietas, Transporte, "
+                            "Material, Formacion)."
+                        ),
                     },
                 },
                 "required": [],
@@ -37,7 +54,8 @@ FUNCTION_SCHEMAS = [
             "name": "consultar_estado",
             "description": (
                 "Consulta el estado de un gasto concreto del empleado autenticado. "
-                "Si no se indica gasto_id, devuelve el gasto más reciente que sigue pendiente."
+                "Si no se indica gasto_id, devuelve el gasto más reciente "
+                "que sigue pendiente."
             ),
             "parameters": {
                 "type": "object",
@@ -66,12 +84,22 @@ FUNCTION_SCHEMAS = [
 
 
 def listar_gastos(
-    db: Session, empleado: str, mes: int | None = None, categoria: str | None = None
+    db: Session,
+    empleado: str,
+    mes: int | None = None,
+    anio: int | None = None,
+    categoria: str | None = None,
 ) -> dict[str, Any]:
     query = db.query(ExpenseDB).filter(ExpenseDB.empleado == empleado)
 
     if mes is not None:
         query = query.filter(func.extract("month", ExpenseDB.fecha) == mes)
+
+        if anio is None:
+            anio = datetime.now(ZONA_HORARIA).year
+
+    if anio is not None:
+        query = query.filter(func.extract("year", ExpenseDB.fecha) == anio)
 
     if categoria is not None:
         query = query.filter(func.lower(ExpenseDB.categoria) == categoria.lower())
@@ -82,20 +110,22 @@ def listar_gastos(
         "total": len(gastos),
         "gastos": [
             {
-                "id": g.id,
-                "fecha": g.fecha.isoformat(),
-                "concepto": g.concepto,
-                "categoria": g.categoria,
-                "importe": float(g.importe),
-                "estado": g.estado,
+                "id": gasto.id,
+                "fecha": gasto.fecha.isoformat(),
+                "concepto": gasto.concepto,
+                "categoria": gasto.categoria,
+                "importe": float(gasto.importe),
+                "estado": gasto.estado,
             }
-            for g in gastos
+            for gasto in gastos
         ],
     }
 
 
 def consultar_estado(
-    db: Session, empleado: str, gasto_id: int | None = None
+    db: Session,
+    empleado: str,
+    gasto_id: int | None = None,
 ) -> dict[str, Any]:
     query = db.query(ExpenseDB).filter(ExpenseDB.empleado == empleado)
 
@@ -145,10 +175,10 @@ def tiempo_medio_aprobacion(db: Session, empleado: str) -> dict[str, Any]:
         }
 
     dias = []
-    for g in gastos:
-        fin = g.fecha_decision_appian or g.fecha_validacion_baw
-        if fin and g.fecha_creacion:
-            dias.append((fin - g.fecha_creacion).total_seconds() / 86400)
+    for gasto in gastos:
+        fin = gasto.fecha_decision_appian or gasto.fecha_validacion_baw
+        if fin and gasto.fecha_creacion:
+            dias.append((fin - gasto.fecha_creacion).total_seconds() / 86400)
 
     if not dias:
         return {
@@ -157,7 +187,10 @@ def tiempo_medio_aprobacion(db: Session, empleado: str) -> dict[str, Any]:
             "mensaje": "No hay timestamps suficientes.",
         }
 
-    return {"muestras": len(dias), "tiempo_medio_dias": round(sum(dias) / len(dias), 2)}
+    return {
+        "muestras": len(dias),
+        "tiempo_medio_dias": round(sum(dias) / len(dias), 2),
+    }
 
 
 FUNCTION_IMPLEMENTATIONS = {
@@ -172,18 +205,26 @@ FUNCTION_DECLARATIONS_GEMINI = [
         name="listar_gastos",
         description=(
             "Lista los gastos del empleado autenticado, opcionalmente "
-            "filtrados por mes (1-12) y/o categoría."
+            "filtrados por mes, año y/o categoría. Para 'este mes', "
+            "usa el mes y año actuales indicados en las instrucciones."
         ),
         parameters=types.Schema(
             type=types.Type.OBJECT,
             properties={
                 "mes": types.Schema(
                     type=types.Type.INTEGER,
-                    description="Mes del año (1-12). Si se omite, no filtra por mes.",
+                    description=DESCRIPCION_MES,
+                ),
+                "anio": types.Schema(
+                    type=types.Type.INTEGER,
+                    description=DESCRIPCION_ANIO,
                 ),
                 "categoria": types.Schema(
                     type=types.Type.STRING,
-                    description="Categoría del gasto (ej. Dietas, Transporte, Material, Formacion).",
+                    description=(
+                        "Categoría del gasto (ej. Dietas, Transporte, "
+                        "Material, Formacion)."
+                    ),
                 ),
             },
         ),
@@ -192,7 +233,8 @@ FUNCTION_DECLARATIONS_GEMINI = [
         name="consultar_estado",
         description=(
             "Consulta el estado de un gasto concreto del empleado autenticado. "
-            "Si no se indica gasto_id, devuelve el gasto más reciente que sigue pendiente."
+            "Si no se indica gasto_id, devuelve el gasto más reciente "
+            "que sigue pendiente."
         ),
         parameters=types.Schema(
             type=types.Type.OBJECT,
