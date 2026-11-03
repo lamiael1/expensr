@@ -41,7 +41,7 @@ function KpiCard({ label, value, detail, color }) {
 }
 
 function DegradationBanner({ fuentes, avisos }) {
-  const fallidas = (fuentes ?? []).filter((f) => f.configurado && !f.ok);
+  const fallidas = (fuentes ?? []).filter((fuente) => fuente.configurado && !fuente.ok);
 
   if (fallidas.length === 0) return null;
 
@@ -51,16 +51,17 @@ function DegradationBanner({ fuentes, avisos }) {
       className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800"
     >
       <p className="font-semibold">
-        Datos parciales: {fallidas.map((f) => f.sistema).join(" y ")} no{" "}
-        {fallidas.length === 1 ? "responde" : "responden"} ahora mismo.
+        Datos parciales: {fallidas.map((fuente) => fuente.sistema).join(" y ")}{" "}
+        no {fallidas.length === 1 ? "responde" : "responden"} ahora mismo.
       </p>
       <p className="mt-1">
-        La vista sigue mostrando los datos disponibles del resto de sistemas.
+        Se mantienen los datos guardados en Expensr y se muestran los sistemas
+        externos disponibles.
       </p>
       {avisos && avisos.length > 0 && (
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          {avisos.map((aviso, i) => (
-            <li key={i}>{aviso}</li>
+          {avisos.map((aviso, indice) => (
+            <li key={`${indice}-${aviso}`}>{aviso}</li>
           ))}
         </ul>
       )}
@@ -76,10 +77,12 @@ function Monitor() {
   const [now, setNow] = useState(() => Date.now());
 
   const loadOverview = useCallback(async () => {
+    setLoading(true);
+
     try {
-      setError("");
       const data = await getMonitorOverview();
       setOverview(data);
+      setError("");
       setLastUpdate(Date.now());
     } catch {
       setError(
@@ -91,12 +94,22 @@ function Monitor() {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(loadOverview, 0);
-    const interval = setInterval(loadOverview, REFRESH_MS);
+    let activo = true;
+    let timeoutId;
+
+    const actualizarYProgramar = async () => {
+      await loadOverview();
+
+      if (activo) {
+        timeoutId = setTimeout(actualizarYProgramar, REFRESH_MS);
+      }
+    };
+
+    actualizarYProgramar();
 
     return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
+      activo = false;
+      clearTimeout(timeoutId);
     };
   }, [loadOverview]);
 
@@ -115,7 +128,8 @@ function Monitor() {
     Appian: punto.appian_horas,
   }));
 
-  const instancias = (overview?.instancias_externas ?? []).slice(0, 5);
+  const instancias = (overview?.instancias ?? []).slice(0, 5);
+
   return (
     <main className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -124,7 +138,7 @@ function Monitor() {
             Monitoreo de procesos
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Estado de los gastos en BAW y Appian, obtenido a través del backend.
+            Estado de los gastos en Expensr, con disponibilidad de BAW y Appian.
           </p>
         </div>
 
@@ -148,7 +162,10 @@ function Monitor() {
       )}
 
       {overview && (
-        <DegradationBanner fuentes={overview.fuentes} avisos={overview.avisos} />
+        <DegradationBanner
+          fuentes={overview.fuentes}
+          avisos={overview.avisos}
+        />
       )}
 
       {loading && !overview && (
@@ -178,7 +195,7 @@ function Monitor() {
             <KpiCard
               label="Tiempo medio"
               value={formatHoras(overview.tiempo_medio_horas)}
-              detail="Desde la creación hasta la decisión"
+              detail="Desde la creación hasta la resolución final"
               color="border-amber-500"
             />
             <KpiCard
@@ -188,7 +205,7 @@ function Monitor() {
                   ? "—"
                   : `${overview.sla_pct} %`
               }
-              detail="Resueltos en 48 h o menos"
+              detail={`Resueltos en ${48} h o menos`}
               color="border-violet-500"
             />
           </section>
@@ -199,7 +216,7 @@ function Monitor() {
                 Tiempo medio por etapa (últimos 7 días)
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Horas medias en BAW y en Appian, por día de creación del gasto.
+                Horas medias en BAW y Appian, por día de creación del gasto.
               </p>
 
               <div className="mt-4 h-64">
@@ -222,7 +239,7 @@ function Monitor() {
                 Instancias recientes
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Los 5 gastos más recientes y su etapa actual.
+                Los cinco gastos más recientes y su etapa guardada en Expensr.
               </p>
 
               <div className="mt-4 overflow-x-auto">
@@ -274,7 +291,7 @@ function Monitor() {
         />
         {segundos === null
           ? "Sin datos todavía."
-          : `Última actualización: hace ${segundos}s · se actualiza cada 30 s.`}
+          : `Última actualización correcta: hace ${segundos}s · se actualiza cada 30 s.`}
       </p>
     </main>
   );
