@@ -13,20 +13,16 @@ router = APIRouter(prefix="/baw", tags=["BAW"])
 
 class BawValidationUpdate(BaseModel):
     centro_coste: str
-
     requiere_revision_manager: bool
-
     estado: str
 
 
 class BawDecisionUpdate(BaseModel):
     estado: str
-
     comentario_baw: str | None = None
 
 
 def _get_expense_or_404(db: Session, gasto_id: int) -> ExpenseDB:
-
     gasto = db.query(ExpenseDB).filter(ExpenseDB.id == gasto_id).first()
 
     if gasto is None:
@@ -45,19 +41,14 @@ def update_baw_validation(
     payload: BawValidationUpdate,
     db: Annotated[Session, Depends(get_db)],
 ):
-
     gasto = _get_expense_or_404(db, gasto_id)
 
     gasto.centro_coste = payload.centro_coste
-
     gasto.requiere_revision_manager = payload.requiere_revision_manager
-
     gasto.estado = payload.estado
-
     gasto.fecha_validacion_baw = datetime.now(UTC)
 
     db.commit()
-
     db.refresh(gasto)
 
     return {"ok": True, "gasto_id": gasto.id, "estado": gasto.estado}
@@ -70,15 +61,23 @@ def update_baw_decision(
     payload: BawDecisionUpdate,
     db: Annotated[Session, Depends(get_db)],
 ):
-
     gasto = _get_expense_or_404(db, gasto_id)
+    estado_recibido = payload.estado.strip().upper()
 
-    gasto.estado = payload.estado
+    if estado_recibido in {"RECHAZADO", "RECHAZADO_BAW"}:
+        gasto.estado = "RECHAZADO"
+    elif estado_recibido in {"APROBADO", "APROBADO_BAW"}:
+        gasto.estado = "APROBADO_BAW"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El estado de decisión de BAW no es válido.",
+        )
 
     gasto.comentario_baw = payload.comentario_baw
+    gasto.fecha_validacion_baw = datetime.now(UTC)
 
     db.commit()
-
     db.refresh(gasto)
 
     return {"ok": True, "gasto_id": gasto.id, "estado": gasto.estado}

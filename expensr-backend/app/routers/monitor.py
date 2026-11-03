@@ -12,8 +12,17 @@ from app.services.process_sources import ProcessInstance, fetch_all
 
 router = APIRouter(prefix="/monitor", tags=["Monitor"])
 
-SLA_HORAS = 48  # un gasto cumple el SLA si se resuelve en 48 h o menos
+SLA_HORAS = 48
 DIAS_SERIE = 7
+
+ESTADOS_RECHAZADOS_BAW = {"RECHAZADO", "RECHAZADO_BAW"}
+ESTADOS_RECHAZADOS_APPIAN = {"RECHAZADO"}
+ESTADOS_FINALIZADOS = {
+    "APROBADO",
+    "RECHAZADO",
+    "APROBADO_BAW",
+    "RECHAZADO_BAW",
+}
 
 
 class ExpenseInstance(BaseModel):
@@ -71,11 +80,31 @@ def _horas(inicio: datetime | None, fin: datetime | None) -> float | None:
     inicio, fin = _aware(inicio), _aware(fin)
     if inicio is None or fin is None:
         return None
-    return (fin - inicio).total_seconds() / 3600
+
+    horas = (fin - inicio).total_seconds() / 3600
+    return horas if horas >= 0 else None
 
 
 def _media(valores: list[float]) -> float:
     return round(sum(valores) / len(valores), 1) if valores else 0.0
+
+
+def _estado_normalizado(estado: str | None) -> str:
+    return (estado or "").strip().upper()
+
+
+def _es_rechazado_baw(estado: str | None) -> bool:
+    return _estado_normalizado(estado) in ESTADOS_RECHAZADOS_BAW
+
+
+def _fecha_fin_gasto(gasto: ExpenseDB) -> datetime | None:
+    if gasto.fecha_decision_appian is not None:
+        return gasto.fecha_decision_appian
+
+    if _es_rechazado_baw(gasto.estado):
+        return gasto.fecha_validacion_baw
+
+    return None
 
 
 def _series_tiempos(db: Session, ahora: datetime) -> list[SerieTiempo]:
@@ -100,7 +129,10 @@ def _series_tiempos(db: Session, ahora: datetime) -> list[SerieTiempo]:
             continue
 
         horas_baw = _horas(gasto.fecha_creacion, gasto.fecha_validacion_baw)
-        horas_appian = _horas(gasto.fecha_validacion_baw, gasto.fecha_decision_appian)
+        horas_appian = _horas(
+            gasto.fecha_validacion_baw,
+            gasto.fecha_decision_appian,
+        )
 
         if horas_baw is not None:
             por_dia[dia]["baw"].append(horas_baw)
@@ -123,7 +155,7 @@ async def get_monitor_overview(
 ):
     ahora = datetime.now(UTC)
 
-    # BAW y Appian se consultan en paralelo; nunca lanza excepción.
+    # BAW y Appian se consultan en paralelo; sus credenciales no llegan al frontend.
     fuentes = await fetch_all()
 
     totals = db.query(
@@ -154,71 +186,92 @@ async def get_monitor_overview(
 
     rejected = (
         db.query(func.count(ExpenseDB.id))
-        .filter(ExpenseDB.estado.in_(["RECHAZADO", "RECHAZADO_BAW"]))
-        .scalar()
-        or 0
-    )
-
-    today = ahora.date()
-
-    completados_hoy = (
-        db.query(func.count(ExpenseDB.id))
         .filter(
-            func.date(ExpenseDB.fecha_decision_appian) == today,
-            ExpenseDB.decision_final.is_not(None),
+            ExpenseDB.estado.in_(
+                sorted(ESTADOS_RECHAZADOS_BAW | ESTADOS_RECHAZADOS_APPIAN)
+            )
         )
         .scalar()
         or 0
     )
 
-    # Tiempo medio y SLA, sobre los gastos con decisión final de Appian
-    resueltos = (
-        db.query(ExpenseDB).filter(ExpenseDB.fecha_decision_appian.is_not(None)).all()
+    gastos = (
+        db.query(ExpenseDB)
+        .order_by(ExpenseDB.fecha_creacion.desc(), ExpenseDB.id.desc())
+        .all()
     )
-    duraciones = [
-        horas
-        for gasto in resueltos
-        if (horas := _horas(gasto.fecha_creacion, gasto.fecha_decision_appian))
-        is not None
-    ]
 
-    tiempo_medio_horas = _media(duraciones) if duraciones else None
+    completados_hoy = 0
+    duraciones_finales: list[float] = []
+
+    for gasto in gastos:
+        fecha_fin = _fecha_fin_gasto(gasto)
+        if fecha_fin is None:
+            continue
+
+        fecha_fin_aware = _aware(fecha_fin)
+        fecha_creacion_aware = _aware(gasto.fecha_creacion)
+
+        if fecha_fin_aware is not None and fecha_fin_aware.date() == ahora.date():
+            completados_hoy += 1
+
+        duracion_total = _horas(gasto.fecha_creacion, fecha_fin)
+        if duracion_total is not None:
+            duraciones_finales.append(duracion_total)
+
+    tiempo_medio_horas = (
+        _media(duraciones_finales) if duraciones_finales else None
+    )
     sla_pct = (
-        round(100 * sum(1 for h in duraciones if h <= SLA_HORAS) / len(duraciones), 1)
-        if duraciones
+        round(
+            100
+            * sum(1 for horas in duraciones_finales if horas <= SLA_HORAS)
+            / len(duraciones_finales),
+            1,
+        )
+        if duraciones_finales
         else None
     )
 
-    expenses = (
-        db.query(ExpenseDB).order_by(ExpenseDB.fecha_creacion.desc()).limit(100).all()
-    )
+    instancias: list[ExpenseInstance] = []
 
-    instancias = []
-
-    for expense in expenses:
+    for expense in gastos[:5]:
         estado = expense.estado or "SIN_ESTADO"
+        estado_normalizado = _estado_normalizado(estado)
         horas_en_etapa = None
 
-        if estado == "PENDIENTE_BAW":
+        if estado_normalizado == "PENDIENTE_BAW":
             sistema = "BAW"
             etapa = "Pendiente de validación BAW"
             horas_en_etapa = _horas(expense.fecha_creacion, ahora)
-        elif estado == "PENDIENTE_APPIAN":
+        elif estado_normalizado == "PENDIENTE_APPIAN":
             sistema = "Appian"
             etapa = "Pendiente de decisión financiera"
             horas_en_etapa = _horas(
-                expense.fecha_validacion_baw or expense.fecha_creacion, ahora
+                expense.fecha_validacion_baw or expense.fecha_creacion,
+                ahora,
             )
-        elif estado in (
-            "APROBADO",
-            "RECHAZADO",
-            "APROBADO_BAW",
-            "RECHAZADO_BAW",
-        ):
+        elif _es_rechazado_baw(estado):
+            sistema = "Finalizado"
+            etapa = "Rechazado en BAW"
+            horas_en_etapa = _horas(
+                expense.fecha_creacion,
+                expense.fecha_validacion_baw,
+            )
+        elif estado_normalizado == "RECHAZADO":
+            sistema = "Finalizado"
+            etapa = "Rechazado en Appian"
+            horas_en_etapa = _horas(
+                expense.fecha_creacion,
+                expense.fecha_decision_appian,
+            )
+        elif estado_normalizado in ESTADOS_FINALIZADOS:
             sistema = "Finalizado"
             etapa = "Proceso finalizado"
-            fin = expense.fecha_decision_appian or expense.fecha_validacion_baw
-            horas_en_etapa = _horas(expense.fecha_creacion, fin)
+            horas_en_etapa = _horas(
+                expense.fecha_creacion,
+                _fecha_fin_gasto(expense),
+            )
         else:
             sistema = "Expensr"
             etapa = estado.replace("_", " ").capitalize()
@@ -231,13 +284,19 @@ async def get_monitor_overview(
                 importe=float(expense.importe),
                 sistema=sistema,
                 etapa_actual=etapa,
-                prioridad=("Alta" if expense.requiere_revision_manager else "Normal"),
+                prioridad=(
+                    "Alta" if expense.requiere_revision_manager else "Normal"
+                ),
                 estado=estado,
                 fecha_creacion=(
-                    expense.fecha_creacion.isoformat() if expense.fecha_creacion else ""
+                    expense.fecha_creacion.isoformat()
+                    if expense.fecha_creacion
+                    else ""
                 ),
                 horas_en_etapa=(
-                    round(horas_en_etapa, 1) if horas_en_etapa is not None else None
+                    round(horas_en_etapa, 1)
+                    if horas_en_etapa is not None
+                    else None
                 ),
             )
         )
@@ -257,13 +316,22 @@ async def get_monitor_overview(
         instancias=instancias,
         fuentes=[
             FuenteEstado(
-                sistema=f.sistema,
-                configurado=f.configurado,
-                ok=f.ok,
-                error=f.error,
+                sistema=fuente.sistema,
+                configurado=fuente.configurado,
+                ok=fuente.ok,
+                error=fuente.error,
             )
-            for f in fuentes
+            for fuente in fuentes
         ],
-        avisos=[f.error for f in fuentes if not f.ok and f.error],
-        instancias_externas=[i for f in fuentes if f.ok for i in f.instancias],
+        avisos=[
+            fuente.error
+            for fuente in fuentes
+            if not fuente.ok and fuente.error
+        ],
+        instancias_externas=[
+            instancia
+            for fuente in fuentes
+            if fuente.ok
+            for instancia in fuente.instancias
+        ],
     )
